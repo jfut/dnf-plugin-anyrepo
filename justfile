@@ -92,13 +92,14 @@ exec-test:
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" add https://github.com/jfut/prec --minimum-release-age 30m
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" config set cache_dir "$tmp/cache"
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global set cache_dir "$tmp/cache"
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" list
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" show prec
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" config set minimum_release_age 1h
-    test "$({{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" config get minimum_release_age)" = "3600"
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" set prec enabled false
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" unset prec enabled
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global show
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" repo show prec
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global set minimum_release_age 1h
+    test "$({{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global get minimum_release_age)" = "3600"
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" repo set prec enabled false
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" repo unset prec enabled
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" remove prec --purge-cache
 
 # Run lint, unit tests, and smoke tests.

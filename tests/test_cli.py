@@ -67,7 +67,7 @@ class CliTest(unittest.TestCase):
                 )
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                result = main(["--config", path, "unset", SSL_CERT_REPO, "minimum_release_age"])
+                result = main(["--config", path, "repo", "unset", SSL_CERT_REPO, "minimum_release_age"])
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
@@ -95,7 +95,7 @@ class CliTest(unittest.TestCase):
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                result = main(["--config", path, "set", "sslcert", "minimum_release_age", "3d"])
+                result = main(["--config", path, "repo", "set", "sslcert", "minimum_release_age", "3d"])
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
@@ -121,19 +121,67 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(stdout.getvalue().strip(), f"{path}: Added [sslcert]")
 
-    def test_config_unset_prints_config_path(self):
+    def test_global_show_prints_main_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    "cache_dir = /tmp/anyrepo-cache\n"
+                    "refresh_interval = 1h\n"
+                    "minimum_release_age = 2d\n"
+                    "debug = true\n"
+                )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "show"])
+            self.assertEqual(result, 0)
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                "\n".join(
+                    [
+                        "cache_dir: /tmp/anyrepo-cache",
+                        "refresh_interval: 1h",
+                        "minimum_release_age: 2d",
+                        "debug: true",
+                    ]
+                ),
+            )
+
+    def test_global_unset_prints_config_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("[main]\nminimum_release_age = 1h\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                result = main(["--config", path, "config", "unset", "minimum_release_age"])
+                result = main(["--config", path, "global", "unset", "minimum_release_age"])
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
                 f"{path}: Unset [main] minimum_release_age",
             )
+
+    def test_repo_show_prints_repository_details(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    "\n"
+                    "[prec]\n"
+                    "url = https://github.com/jfut/prec\n"
+                    "minimum_release_age = 1d\n"
+                )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "show", "prec"])
+            self.assertEqual(result, 0)
+            output = stdout.getvalue()
+            self.assertIn("name: prec\n", output)
+            self.assertIn("owner: jfut\n", output)
+            self.assertIn("repo: prec\n", output)
+            self.assertIn("minimum_release_age: 1d\n", output)
 
     def test_set_prints_before_and_after_values(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -148,7 +196,7 @@ class CliTest(unittest.TestCase):
                 )
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                result = main(["--config", path, "set", "nmcli-cli", "minimum_release_age", "1h"])
+                result = main(["--config", path, "repo", "set", "nmcli-cli", "minimum_release_age", "1h"])
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
@@ -162,7 +210,7 @@ class CliTest(unittest.TestCase):
                 fh.write("[main]\n")
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
-                result = main(["--config", path, "set", "missing", "minimum_release_age", "1h"])
+                result = main(["--config", path, "repo", "set", "missing", "minimum_release_age", "1h"])
             self.assertEqual(result, 1)
             self.assertEqual(
                 stderr.getvalue().strip(),
@@ -181,7 +229,7 @@ class CliTest(unittest.TestCase):
                 )
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
-                result = main(["--config", path, "set", "nmcli-cli", "unknown_key", "3d"])
+                result = main(["--config", path, "repo", "set", "nmcli-cli", "unknown_key", "3d"])
             self.assertEqual(result, 1)
             self.assertEqual(
                 stderr.getvalue().strip(),
