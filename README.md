@@ -72,7 +72,7 @@ sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         
 Show details for one AnyRepo repository:
 
 ```bash
-# dnf-anyrepo show prec
+# dnf-anyrepo repo show prec
 name: prec
 source: github-release
 owner: jfut
@@ -107,15 +107,15 @@ Change the global default setting:
 Repositories without their own `minimum_release_age` override inherit this value.
 
 ```bash
-# dnf-anyrepo config set minimum_release_age 10h
+# dnf-anyrepo global set minimum_release_age 10h
 /etc/dnf/plugins/anyrepo.conf: [main] minimum_release_age: 3d -> 10h
 ```
 
 Change `minimum_release_age` for individual repositories:
 
 ```bash
-# dnf-anyrepo set nmcli-cli minimum_release_age 3h
-# dnf-anyrepo set sslcert-cli minimum_release_age 5h
+# dnf-anyrepo repo set nmcli-cli minimum_release_age 3h
+# dnf-anyrepo repo set sslcert-cli minimum_release_age 5h
 ```
 
 Refresh the local cache explicitly:
@@ -365,15 +365,21 @@ Examples:
 
 ```bash
 # Set the global default release age to 1 day.
-dnf-anyrepo config set minimum_release_age 1d
+dnf-anyrepo global set minimum_release_age 1d
+
+# Reset the global release age to the built-in default.
+dnf-anyrepo global unset minimum_release_age
 
 # Override only one repository to 30 minutes.
-dnf-anyrepo set NAME minimum_release_age 30m
+dnf-anyrepo repo set NAME minimum_release_age 30m
+
+# Remove the repository-specific override.
+dnf-anyrepo repo unset NAME minimum_release_age
 ```
 
-The first command updates `[main]` and affects repositories that inherit the global setting.
+The `global` commands update `[main]` and affect repositories that inherit the global setting.
 
-The second command updates the named repository section and overrides the global value only for that repository.
+The `repo` commands update the named repository section and override or restore the global value only for that repository.
 
 ## How it works
 
@@ -423,19 +429,19 @@ dnf-anyrepo list
 Global configuration:
 
 ```bash
-dnf-anyrepo config get minimum_release_age
-dnf-anyrepo config set minimum_release_age 1h
-dnf-anyrepo config unset minimum_release_age
+dnf-anyrepo global show
+dnf-anyrepo global get minimum_release_age
+dnf-anyrepo global set minimum_release_age 1h
+dnf-anyrepo global unset minimum_release_age
 ```
 
 Update repository settings:
 
 ```bash
-dnf-anyrepo show prec
-
-dnf-anyrepo set prec minimum_release_age 1d
-dnf-anyrepo set prec enabled false
-dnf-anyrepo unset prec minimum_release_age
+dnf-anyrepo repo show prec
+dnf-anyrepo repo set prec minimum_release_age 1d
+dnf-anyrepo repo set prec enabled false
+dnf-anyrepo repo unset prec minimum_release_age
 ```
 
 Refresh and remove repositories:

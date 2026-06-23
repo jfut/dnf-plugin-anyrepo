@@ -50,28 +50,31 @@ def build_parser() -> argparse.ArgumentParser:
     remove.add_argument("--purge-cache", action="store_true")
 
     sub.add_parser("list")
-    show = sub.add_parser("show")
-    show.add_argument("name")
 
     refresh = sub.add_parser("refresh")
     refresh.add_argument("name", nargs="?")
     refresh.add_argument("--force", action="store_true")
 
-    config = sub.add_parser("config")
-    config_sub = config.add_subparsers(dest="config_command")
-    get = config_sub.add_parser("get")
+    global_cmd = sub.add_parser("global")
+    global_sub = global_cmd.add_subparsers(dest="global_command")
+    global_sub.add_parser("show")
+    get = global_sub.add_parser("get")
     get.add_argument("key")
-    set_cmd = config_sub.add_parser("set")
+    set_cmd = global_sub.add_parser("set")
     set_cmd.add_argument("key")
     set_cmd.add_argument("value")
-    unset = config_sub.add_parser("unset")
+    unset = global_sub.add_parser("unset")
     unset.add_argument("key")
 
-    repo_set = sub.add_parser("set")
+    repo = sub.add_parser("repo")
+    repo_sub = repo.add_subparsers(dest="repo_command")
+    repo_show = repo_sub.add_parser("show")
+    repo_show.add_argument("name")
+    repo_set = repo_sub.add_parser("set")
     repo_set.add_argument("name")
     repo_set.add_argument("key")
     repo_set.add_argument("value")
-    repo_unset = sub.add_parser("unset")
+    repo_unset = repo_sub.add_parser("unset")
     repo_unset.add_argument("name")
     repo_unset.add_argument("key")
     return parser
@@ -82,8 +85,11 @@ def main(argv=None):
     if not args.command:
         build_parser().print_help(sys.stderr)
         return 2
-    if args.command == "config" and not args.config_command:
-        print("dnf-anyrepo config: missing command", file=sys.stderr)
+    if args.command == "global" and not args.global_command:
+        print("dnf-anyrepo global: missing command", file=sys.stderr)
+        return 2
+    if args.command == "repo" and not args.repo_command:
+        print("dnf-anyrepo repo: missing command", file=sys.stderr)
         return 2
     try:
         return _run(args)
@@ -127,12 +133,6 @@ def _run(args: argparse.Namespace) -> int:
         _print_list(config)
         return 0
 
-    if args.command == "show":
-        config = load_config(args.config)
-        repo = config.repos[args.name]
-        _print_show(repo)
-        return 0
-
     if args.command == "refresh":
         manager = RepositoryManager(config_path=args.config)
         if args.name:
@@ -143,47 +143,69 @@ def _run(args: argparse.Namespace) -> int:
                 print(f"{name}: {'refreshed' if changed else 'unchanged'}")
         return 0
 
-    if args.command == "config":
-        return _run_main_config(args)
+    if args.command == "global":
+        return _run_global_config(args)
 
-    if args.command == "set":
-        config = load_config(args.config)
-        if args.name not in config.repos:
-            raise ConfigError(f"repository not found: {args.name}")
-        before = _describe_current_value(args.config, args.name, args.key)
-        set_value(args.config, args.name, args.key, args.value)
-        print(f"{args.config}: [{args.name}] {args.key}: {before} -> {args.value}")
-        return 0
-
-    if args.command == "unset":
-        removed = unset_value(args.config, args.name, args.key)
-        # Keep mutation output consistent with add/remove/set.
-        verb = "Unset" if removed else "Not set"
-        print(f"{args.config}: {verb} [{args.name}] {args.key}")
-        return 0
+    if args.command == "repo":
+        if args.repo_command == "show":
+            return _run_repo_show(args)
+        if args.repo_command == "set":
+            return _run_repo_set(args)
+        if args.repo_command == "unset":
+            return _run_repo_unset(args)
+        raise ConfigError(f"unknown repo command: {args.repo_command}")
 
     raise ConfigError(f"unknown command: {args.command}")
 
 
-def _run_main_config(args: argparse.Namespace) -> int:
-    if args.config_command == "get":
+def _run_repo_show(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    repo = config.repos[args.name]
+    _print_repo_show(repo)
+    return 0
+
+
+def _run_repo_set(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if args.name not in config.repos:
+        raise ConfigError(f"repository not found: {args.name}")
+    before = _describe_current_value(args.config, args.name, args.key)
+    set_value(args.config, args.name, args.key, args.value)
+    print(f"{args.config}: [{args.name}] {args.key}: {before} -> {args.value}")
+    return 0
+
+
+def _run_repo_unset(args: argparse.Namespace) -> int:
+    removed = unset_value(args.config, args.name, args.key)
+    # Keep mutation output consistent with add/remove/set.
+    verb = "Unset" if removed else "Not set"
+    print(f"{args.config}: {verb} [{args.name}] {args.key}")
+    return 0
+
+
+def _run_global_config(args: argparse.Namespace) -> int:
+    if args.global_command == "show":
+        config = load_config(args.config)
+        _print_global_show(config.main)
+        return 0
+    if args.global_command == "get":
         config = load_config(args.config)
         if not hasattr(config.main, args.key):
             raise ConfigError(f"unknown main key: {args.key}")
         print(getattr(config.main, args.key))
         return 0
-    if args.config_command == "set":
+    if args.global_command == "set":
         before = _describe_current_value(args.config, "main", args.key)
         set_value(args.config, "main", args.key, args.value)
         print(f"{args.config}: [main] {args.key}: {before} -> {args.value}")
         return 0
-    if args.config_command == "unset":
+    if args.global_command == "unset":
         removed = unset_value(args.config, "main", args.key)
         # Keep mutation output consistent with add/remove/set.
         verb = "Unset" if removed else "Not set"
         print(f"{args.config}: {verb} [main] {args.key}")
         return 0
-    raise ConfigError(f"unknown config command: {args.config_command}")
+    raise ConfigError(f"unknown global command: {args.global_command}")
 
 
 def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
@@ -226,7 +248,18 @@ def _print_list(config) -> None:
         print("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
 
 
-def _print_show(repo) -> None:
+def _print_global_show(main) -> None:
+    values = {
+        "cache_dir": main.cache_dir,
+        "refresh_interval": format_duration(main.refresh_interval),
+        "minimum_release_age": format_duration(main.minimum_release_age),
+        "debug": "true" if main.debug else "false",
+    }
+    for key, value in values.items():
+        print(f"{key}: {value}")
+
+
+def _print_repo_show(repo) -> None:
     owner, github_repo = parse_github_url(repo.url)
     state = load_state(repo.cache_path)
     cached_assets = state.get("asset_names", [])
