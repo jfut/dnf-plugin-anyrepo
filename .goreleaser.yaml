@@ -48,15 +48,18 @@ nfpms:
     package_name: dnf-plugin-anyrepo
     file_name_template: "{{ .PackageName }}-{{ .Version }}-{{ .Release }}.el8.noarch"
     description: |-
-      dnf-plugin-anyrepo exposes RPM assets from configured download sources as
-      local DNF repositories.
-    maintainer: dnf-plugin-anyrepo contributors <noreply@example.invalid>
+      dnf-plugin-anyrepo is a DNF plugin that makes remote RPM assets available
+      to ordinary DNF commands as transparent, dynamic local RPM repositories.
+    maintainer: Jun Futagawa <jfut@integ.jp>
     license: Apache-2.0
     vendor: dnf-plugin-anyrepo project
     homepage: https://github.com/jfut/dnf-plugin-anyrepo
     section: utils
     formats:
       - rpm
+    rpm:
+      signature:
+        key_file: '{{ with index .Env "GPG_KEY_PATH" }}{{ . }}{{ end }}'
     release: 1
     dependencies:
       - python3
@@ -113,15 +116,18 @@ nfpms:
     package_name: dnf-plugin-anyrepo
     file_name_template: "{{ .PackageName }}-{{ .Version }}-{{ .Release }}.el9.noarch"
     description: |-
-      dnf-plugin-anyrepo exposes RPM assets from configured download sources as
-      local DNF repositories.
-    maintainer: dnf-plugin-anyrepo contributors <noreply@example.invalid>
+      dnf-plugin-anyrepo is a DNF plugin that makes remote RPM assets available
+      to ordinary DNF commands as transparent, dynamic local RPM repositories.
+    maintainer: Jun Futagawa <jfut@integ.jp>
     license: Apache-2.0
     vendor: dnf-plugin-anyrepo project
     homepage: https://github.com/jfut/dnf-plugin-anyrepo
     section: utils
     formats:
       - rpm
+    rpm:
+      signature:
+        key_file: '{{ with index .Env "GPG_KEY_PATH" }}{{ . }}{{ end }}'
     release: 1
     dependencies:
       - python3
@@ -178,15 +184,18 @@ nfpms:
     package_name: dnf-plugin-anyrepo
     file_name_template: "{{ .PackageName }}-{{ .Version }}-{{ .Release }}.el10.noarch"
     description: |-
-      dnf-plugin-anyrepo exposes RPM assets from configured download sources as
-      local DNF repositories.
-    maintainer: dnf-plugin-anyrepo contributors <noreply@example.invalid>
+      dnf-plugin-anyrepo is a DNF plugin that makes remote RPM assets available
+      to ordinary DNF commands as transparent, dynamic local RPM repositories.
+    maintainer: Jun Futagawa <jfut@integ.jp>
     license: Apache-2.0
     vendor: dnf-plugin-anyrepo project
     homepage: https://github.com/jfut/dnf-plugin-anyrepo
     section: utils
     formats:
       - rpm
+    rpm:
+      signature:
+        key_file: '{{ with index .Env "GPG_KEY_PATH" }}{{ . }}{{ end }}'
     release: 1
     dependencies:
       - python3
