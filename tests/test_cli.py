@@ -102,6 +102,25 @@ class CliTest(unittest.TestCase):
                 f"{path}: [sslcert] minimum_release_age: global(3d) -> 3d",
             )
 
+    def test_add_with_short_name_uses_alias(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            stdout = io.StringIO()
+            # Verify the short alias flag stores the same repository name as --name.
+            with contextlib.redirect_stdout(stdout):
+                result = main(
+                    [
+                        "--config",
+                        path,
+                        "add",
+                        "https://github.com/jfut/sslcert-cli",
+                        "-n",
+                        "sslcert",
+                    ]
+                )
+            self.assertEqual(result, 0)
+            self.assertEqual(stdout.getvalue().strip(), f"{path}: Added [sslcert]")
+
     def test_config_unset_prints_config_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")

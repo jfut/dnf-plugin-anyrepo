@@ -33,7 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     add = sub.add_parser("add")
     add.add_argument("url")
-    add.add_argument("--name")
+    add.add_argument("-n", "--name")
     add.add_argument("--source", default="github-release")
     add.add_argument("--asset-regex")
     add.add_argument("--arch")

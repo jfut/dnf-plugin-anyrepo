@@ -45,7 +45,7 @@ dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/
 
 After installation, register GitHub repositories that publish RPM assets:
 
-Use `--name` to register a repository under an alias instead of the repository name.
+Use `-n` or `--name` to register a repository under an alias instead of the repository name.
 
 ```bash
 # dnf-anyrepo add https://github.com/jfut/dnf-plugin-anyrepo
@@ -53,7 +53,7 @@ Use `--name` to register a repository under an alias instead of the repository n
 # dnf-anyrepo add https://github.com/jfut/sslcert-cli
 # dnf-anyrepo add https://github.com/jfut/nmcli-cli
 # dnf-anyrepo add https://github.com/jfut/ipset-fast-update
-# dnf-anyrepo add https://github.com/firehol/packages --name firehol
+# dnf-anyrepo add https://github.com/firehol/packages -n firehol
 ```
 
 List repositories managed by AnyRepo:
@@ -408,7 +408,7 @@ Add repositories:
 ```bash
 # basic
 dnf-anyrepo add https://github.com/jfut/prec
-dnf-anyrepo add https://github.com/firehol/packages --name firehol
+dnf-anyrepo add https://github.com/firehol/packages -n firehol
 
 # with options
 dnf-anyrepo add https://github.com/jfut/prec --asset-regex '.*\.rpm$'
