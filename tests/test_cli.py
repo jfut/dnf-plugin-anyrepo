@@ -15,15 +15,15 @@ SSL_CERT_REPO = "sslcert-cli"
 
 
 class CliTest(unittest.TestCase):
-    def test_add_prints_config_path(self):
+    def test_add_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             stdout = io.StringIO()
-            # Confirm add output tells users where the repository was persisted.
+            # Show the added repository first, then the config file that changed.
             with contextlib.redirect_stdout(stdout):
                 result = main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"{path}: Added [{SSL_CERT_REPO}]")
+            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo added ({path})")
 
     def test_add_existing_repo_prints_config_path(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -38,7 +38,7 @@ class CliTest(unittest.TestCase):
                 f"{path}: Repository already exists [{SSL_CERT_REPO}]",
             )
 
-    def test_remove_prints_config_path(self):
+    def test_remove_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
@@ -49,11 +49,11 @@ class CliTest(unittest.TestCase):
                     "url = https://github.com/jfut/sslcert-cli\n"
                 )
             stdout = io.StringIO()
-            # Confirm remove output matches add and shows the modified config file.
+            # Show the removed repository first, then the config file that changed.
             with contextlib.redirect_stdout(stdout):
                 result = main(["--config", path, "remove", SSL_CERT_REPO])
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"{path}: Removed [{SSL_CERT_REPO}]")
+            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo removed ({path})")
 
     def test_unset_prints_config_path(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -92,7 +92,7 @@ class CliTest(unittest.TestCase):
                     ]
                 )
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"{path}: Added [sslcert]")
+            self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({path})")
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -100,7 +100,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"{path}: [sslcert] minimum_release_age: global(3d) -> 3d",
+                f"[sslcert] minimum_release_age: global(3d) -> 3d ({path})",
             )
 
     def test_add_with_short_name_uses_alias(self):
@@ -120,7 +120,7 @@ class CliTest(unittest.TestCase):
                     ]
                 )
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"{path}: Added [sslcert]")
+            self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({path})")
 
     def test_global_show_prints_main_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -252,7 +252,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"{path}: [nmcli-cli] minimum_release_age: global(3d) -> 1h",
+                f"[nmcli-cli] minimum_release_age: global(3d) -> 1h ({path})",
             )
 
     def test_set_gpgcheck_prints_inherited_before_value(self):
@@ -266,7 +266,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"{path}: [prec] gpgcheck: global(0) -> 0",
+                f"[prec] gpgcheck: global(0) -> 0 ({path})",
             )
 
     def test_repo_show_prints_repository_gpgcheck_override(self):

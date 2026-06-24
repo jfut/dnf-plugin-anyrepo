@@ -123,7 +123,7 @@ Repositories without their own `minimum_release_age` override inherit this value
 
 ```bash
 # dnf-anyrepo global set minimum_release_age 10h
-/etc/dnf/plugins/anyrepo.conf: [main] minimum_release_age: 3d -> 10h
+[main] minimum_release_age: 3d -> 10h (/etc/dnf/plugins/anyrepo.conf)
 ```
 
 Change `minimum_release_age` for individual repositories:
@@ -205,7 +205,7 @@ Remove the AnyRepo repository entry:
 
 ```bash
 # dnf-anyrepo remove prec
-/etc/dnf/plugins/anyrepo.conf: Removed [prec]
+[prec] repo removed (/etc/dnf/plugins/anyrepo.conf)
 ```
 
 ## DNF integration

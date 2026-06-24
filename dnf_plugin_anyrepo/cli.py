@@ -102,7 +102,7 @@ def _run(args: argparse.Namespace) -> int:
             values["enabled"] = "false"
         name = validate_repo_name(args.name) if args.name else repo_name_from_url(args.url)
         add_repo(args.config, name, args.url, args.source, values, force=args.force)
-        print(f"{args.config}: Added [{name}]")
+        _print_mutation_result(args.config, f"[{name}] repo added")
         return 0
 
     if args.command == "remove":
@@ -113,8 +113,7 @@ def _run(args: argparse.Namespace) -> int:
             local_repo.remove_cache(repo.cache_path)
         if not removed:
             raise ConfigError(f"repository not found: {args.name}")
-        # Match add output so users always see which config file changed.
-        print(f"{args.config}: Removed [{args.name}]")
+        _print_mutation_result(args.config, f"[{args.name}] repo removed")
         return 0
 
     if args.command == "list":
@@ -160,7 +159,7 @@ def _run_repo_set(args: argparse.Namespace) -> int:
         raise ConfigError(f"repository not found: {args.name}")
     before = _describe_current_value(args.config, args.name, args.key)
     set_value(args.config, args.name, args.key, args.value)
-    print(f"{args.config}: [{args.name}] {args.key}: {before} -> {args.value}")
+    _print_set_result(args.config, args.name, args.key, before, args.value)
     return 0
 
 
@@ -186,7 +185,7 @@ def _run_global_config(args: argparse.Namespace) -> int:
     if args.global_command == "set":
         before = _describe_current_value(args.config, "main", args.key)
         set_value(args.config, "main", args.key, args.value)
-        print(f"{args.config}: [main] {args.key}: {before} -> {args.value}")
+        _print_set_result(args.config, "main", args.key, before, args.value)
         return 0
     if args.global_command == "unset":
         removed = unset_value(args.config, "main", args.key)
@@ -273,6 +272,16 @@ def _print_key_value(key: str, value: str) -> None:
         print(f"{key}:")
         return
     print(f"{key}: {value}")
+
+
+def _print_set_result(path: str, section: str, key: str, before: str, after: str) -> None:
+    # Show the changed setting first so the important diff is easy to scan.
+    _print_mutation_result(path, f"[{section}] {key}: {before} -> {after}")
+
+
+def _print_mutation_result(path: str, message: str) -> None:
+    # Keep the changed item first and leave the source config path as context.
+    print(f"{message} ({path})")
 
 
 def _format_repo_config_value(config, repo, key: str) -> str:
