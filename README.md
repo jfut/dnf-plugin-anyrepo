@@ -14,30 +14,33 @@ AnyRepo refreshes and registers the matching assets as local `file://` repositor
 
 Typical examples:
 
-- `https://github.com/jfut/dnf-plugin-anyrepo/releases`
-- `https://github.com/jfut/prec/releases`
+- https://github.com/jfut/dnf-plugin-anyrepo/releases
+- https://github.com/jfut/prec/releases
 
 Once configured, users can run commands such as:
 
 ```bash
 dnf install prec
-dnf update prec
+dnf upgrade prec
 ```
 
 Dependency resolution and package version selection are still handled by DNF itself.
 
 ## Installation
 
-Install from GitHub Releases by choosing the RPM that matches the target RHEL major version:
+Install from [Releases](https://github.com/jfut/dnf-plugin-anyrepo/releases) by choosing the RPM that matches the target RHEL major version:
 
 ```bash
-# RHEL 8, AlmaLinux 8, Rocky Linux 8, and other compatible distributions.
+# Import the RPM public signing key for dnf-plugin-anyrepo
+# rpm --import https://raw.githubusercontent.com/jfut/dnf-plugin-anyrepo/refs/heads/main/packaging/RPM-GPG-KEY-jfut-github
+
+# RHEL 8, AlmaLinux 8, Rocky Linux 8, and other compatible distributions
 dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/dnf-plugin-anyrepo-x.y.z-n.el8.noarch.rpm
 
-# RHEL 9, AlmaLinux 9, Rocky Linux 9, and other compatible distributions.
+# RHEL 9, AlmaLinux 9, Rocky Linux 9, and other compatible distributions
 dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/dnf-plugin-anyrepo-x.y.z-n.el9.noarch.rpm
 
-# RHEL 10, AlmaLinux 10, Rocky Linux 10, and other compatible distributions.
+# RHEL 10, AlmaLinux 10, Rocky Linux 10, and other compatible distributions
 dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/dnf-plugin-anyrepo-x.y.z-n.el10.noarch.rpm
 ```
 
@@ -146,7 +149,7 @@ sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         
 Install packages through ordinary `dnf install`:
 
 When AnyRepo-managed RPMs are unsigned and `gpgcheck = 0`, AnyRepo prints a `WARNING` before DNF asks for transaction confirmation.
-The same warning flow applies to `dnf update`.
+The same warning flow applies to `dnf upgrade`.
 
 ```bash
 # dnf install prec
@@ -184,11 +187,11 @@ Installed:
 Complete!
 ```
 
-Update packages through ordinary `dnf update`:
+Update packages through ordinary `dnf upgrade`:
 
 ```bash
-# dnf update prec
-# dnf update
+# dnf upgrade prec
+# dnf upgrade
 ```
 
 Automatic updates through `dnf-automatic.timer` also pick up AnyRepo-managed packages transparently.
