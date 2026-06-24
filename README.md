@@ -81,19 +81,17 @@ sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         
 Show details for one AnyRepo repository:
 
 ```bash
-# dnf-anyrepo repo prec show
-name: prec
-source: github-release
-owner: jfut
-repo: prec
+# dnf-anyrepo repo prec
+arch: x86_64
 asset_regex: .*\.rpm$
-enabled: yes
-minimum_release_age: 3d
-cache_dir: /var/cache/dnf/anyrepo/prec
-latest_tag: v0.1.1
-latest_release_id: 340645091
-last_refresh_at: 2026-06-22T04:56:54Z
-cached_assets: prec-0.1.1-1.x86_64.rpm
+cache_dir: global(/var/cache/dnf/anyrepo)
+enabled: true
+github_token_file:
+minimum_release_age: global(3d)
+refresh_interval: global(10m)
+releasever: el9
+source: github-release
+url: https://github.com/jfut/prec
 ```
 
 AnyRepo repositories appear transparently in `dnf list`:
@@ -438,7 +436,7 @@ dnf-anyrepo list
 Global configuration:
 
 ```bash
-dnf-anyrepo global show
+dnf-anyrepo global
 dnf-anyrepo global get minimum_release_age
 dnf-anyrepo global set minimum_release_age 1h
 dnf-anyrepo global unset minimum_release_age
@@ -447,7 +445,7 @@ dnf-anyrepo global unset minimum_release_age
 Update repository settings:
 
 ```bash
-dnf-anyrepo repo prec show
+dnf-anyrepo repo prec
 dnf-anyrepo repo prec set minimum_release_age 1d
 dnf-anyrepo repo prec set enabled false
 dnf-anyrepo repo prec unset minimum_release_age

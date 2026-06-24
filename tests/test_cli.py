@@ -134,16 +134,16 @@ class CliTest(unittest.TestCase):
                 )
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                result = main(["--config", path, "global", "show"])
+                result = main(["--config", path, "global"])
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
                 "\n".join(
                     [
                         "cache_dir: /tmp/anyrepo-cache",
-                        "refresh_interval: 1h",
-                        "minimum_release_age: 2d",
                         "debug: true",
+                        "minimum_release_age: 2d",
+                        "refresh_interval: 1h",
                     ]
                 ),
             )
@@ -168,20 +168,36 @@ class CliTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(
                     "[main]\n"
+                    "cache_dir = /tmp/anyrepo-cache\n"
+                    "refresh_interval = 1h\n"
+                    "minimum_release_age = 2d\n"
                     "\n"
                     "[prec]\n"
                     "url = https://github.com/jfut/prec\n"
-                    "minimum_release_age = 1d\n"
+                    "arch = x86_64\n"
+                    "releasever = el9\n"
                 )
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                result = main(["--config", path, "repo", "prec", "show"])
+                result = main(["--config", path, "repo", "prec"])
             self.assertEqual(result, 0)
-            output = stdout.getvalue()
-            self.assertIn("name: prec\n", output)
-            self.assertIn("owner: jfut\n", output)
-            self.assertIn("repo: prec\n", output)
-            self.assertIn("minimum_release_age: 1d\n", output)
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                "\n".join(
+                    [
+                        "arch: x86_64",
+                        "asset_regex: .*\\.rpm$",
+                        "cache_dir: global(/tmp/anyrepo-cache)",
+                        "enabled: true",
+                        "github_token_file:",
+                        "minimum_release_age: global(2d)",
+                        "refresh_interval: global(1h)",
+                        "releasever: el9",
+                        "source: github-release",
+                        "url: https://github.com/jfut/prec",
+                    ]
+                ),
+            )
 
     def test_set_prints_before_and_after_values(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -94,8 +94,8 @@ exec-test:
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" add https://github.com/jfut/prec --minimum-release-age 30m
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global set cache_dir "$tmp/cache"
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" list
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global show
-    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" repo prec show
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global
+    {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" repo prec
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global set minimum_release_age 1h
     test "$({{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" global get minimum_release_age)" = "3600"
     {{PYTHON}} -m dnf_plugin_anyrepo.cli --config "$tmp/anyrepo.conf" repo prec set enabled false

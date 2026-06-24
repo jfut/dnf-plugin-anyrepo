@@ -15,7 +15,6 @@ from dnf_plugin_anyrepo.config import (
     format_duration,
     iter_repo_rows,
     load_config,
-    parse_github_url,
     remove_section,
     repo_name_from_url,
     set_value,
@@ -23,7 +22,6 @@ from dnf_plugin_anyrepo.config import (
     validate_repo_name,
 )
 from dnf_plugin_anyrepo.manager import RepositoryManager
-from dnf_plugin_anyrepo.state import load_state
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -57,7 +55,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     global_cmd = sub.add_parser("global")
     global_sub = global_cmd.add_subparsers(dest="global_command")
-    global_sub.add_parser("show")
     get = global_sub.add_parser("get")
     get.add_argument("key")
     set_cmd = global_sub.add_parser("set")
@@ -69,7 +66,6 @@ def build_parser() -> argparse.ArgumentParser:
     repo = sub.add_parser("repo")
     repo.add_argument("name")
     repo_sub = repo.add_subparsers(dest="repo_command")
-    repo_sub.add_parser("show")
     repo_set = repo_sub.add_parser("set")
     repo_set.add_argument("key")
     repo_set.add_argument("value")
@@ -82,12 +78,6 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     if not args.command:
         build_parser().print_help(sys.stderr)
-        return 2
-    if args.command == "global" and not args.global_command:
-        print("dnf-anyrepo global: missing command", file=sys.stderr)
-        return 2
-    if args.command == "repo" and not args.repo_command:
-        print("dnf-anyrepo repo: missing command", file=sys.stderr)
         return 2
     try:
         return _run(args)
@@ -145,7 +135,7 @@ def _run(args: argparse.Namespace) -> int:
         return _run_global_config(args)
 
     if args.command == "repo":
-        if args.repo_command == "show":
+        if not args.repo_command:
             return _run_repo_show(args)
         if args.repo_command == "set":
             return _run_repo_set(args)
@@ -159,7 +149,7 @@ def _run(args: argparse.Namespace) -> int:
 def _run_repo_show(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     repo = config.repos[args.name]
-    _print_repo_show(repo)
+    _print_repo_show(config, repo)
     return 0
 
 
@@ -182,7 +172,7 @@ def _run_repo_unset(args: argparse.Namespace) -> int:
 
 
 def _run_global_config(args: argparse.Namespace) -> int:
-    if args.global_command == "show":
+    if not args.global_command:
         config = load_config(args.config)
         _print_global_show(config.main)
         return 0
@@ -249,34 +239,45 @@ def _print_list(config) -> None:
 def _print_global_show(main) -> None:
     values = {
         "cache_dir": main.cache_dir,
+        "debug": "true" if main.debug else "false",
         "refresh_interval": format_duration(main.refresh_interval),
         "minimum_release_age": format_duration(main.minimum_release_age),
-        "debug": "true" if main.debug else "false",
     }
-    for key, value in values.items():
-        print(f"{key}: {value}")
+    for key, value in sorted(values.items()):
+        _print_key_value(key, value)
 
 
-def _print_repo_show(repo) -> None:
-    owner, github_repo = parse_github_url(repo.url)
-    state = load_state(repo.cache_path)
-    cached_assets = state.get("asset_names", [])
+def _print_repo_show(config, repo) -> None:
     values = {
-        "name": repo.name,
-        "source": repo.source,
-        "owner": owner,
-        "repo": github_repo,
-        "asset_regex": repo.asset_regex,
-        "enabled": "yes" if repo.enabled else "no",
-        "minimum_release_age": format_duration(repo.minimum_release_age),
-        "cache_dir": repo.cache_path,
-        "latest_tag": state.get("latest_tag", ""),
-        "latest_release_id": state.get("latest_release_id", ""),
-        "last_refresh_at": state.get("last_refresh_at", ""),
-        "cached_assets": ", ".join(cached_assets),
+        "asset_regex": _format_repo_config_value(config, repo, "asset_regex"),
+        "arch": _format_repo_config_value(config, repo, "arch"),
+        "cache_dir": _format_repo_config_value(config, repo, "cache_dir"),
+        "enabled": _format_repo_config_value(config, repo, "enabled"),
+        "github_token_file": _format_repo_config_value(config, repo, "github_token_file"),
+        "minimum_release_age": _format_repo_config_value(config, repo, "minimum_release_age"),
+        "refresh_interval": _format_repo_config_value(config, repo, "refresh_interval"),
+        "releasever": _format_repo_config_value(config, repo, "releasever"),
+        "source": _format_repo_config_value(config, repo, "source"),
+        "url": _format_repo_config_value(config, repo, "url"),
     }
-    for key, value in values.items():
-        print(f"{key}: {value}")
+    for key, value in sorted(values.items()):
+        _print_key_value(key, value)
+
+
+def _print_key_value(key: str, value: str) -> None:
+    # Avoid trailing whitespace when an optional config value is unset.
+    if value == "":
+        print(f"{key}:")
+        return
+    print(f"{key}: {value}")
+
+
+def _format_repo_config_value(config, repo, key: str) -> str:
+    value = getattr(repo, key)
+    inherited_global_keys = {"cache_dir", "refresh_interval", "minimum_release_age"}
+    if key in inherited_global_keys and key not in _section_options(config.path, repo.name):
+        return f"global({_format_display_value(key, value)})"
+    return _format_display_value(key, value)
 
 
 def _section_options(path, section):
@@ -309,6 +310,8 @@ def _describe_current_value(path: str, section: str, key: str) -> str:
 
 
 def _format_display_value(key: str, value, inherited: bool = False) -> str:
+    if value is None:
+        return ""
     if key in {"minimum_release_age", "refresh_interval"}:
         return format_duration(value, inherited=inherited)
     if isinstance(value, bool):
