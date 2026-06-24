@@ -43,7 +43,13 @@ dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/
 
 ## Example workflow
 
-After installation, register GitHub repositories that publish RPM assets:
+If the RPM public signing key is available, import it first:
+
+```bash
+# rpm --import https://raw.githubusercontent.com/jfut/dnf-plugin-anyrepo/refs/heads/main/packaging/RPM-GPG-KEY-jfut-github
+```
+
+Register GitHub repositories that publish RPM assets:
 
 Use `-n` or `--name` to register a repository under an alias instead of the repository name.
 
