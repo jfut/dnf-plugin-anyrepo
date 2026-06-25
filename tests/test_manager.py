@@ -5,12 +5,19 @@ import os
 import tempfile
 import unittest
 
-from dnf_plugin_anyrepo.config import PluginConfig, RepoConfig, MainConfig
+from dnf_plugin_anyrepo.config import ConfigError, MainConfig, PluginConfig, RepoConfig
 from dnf_plugin_anyrepo.manager import RepositoryManager
 from dnf_plugin_anyrepo.state import save_state
 
 
 class RepositoryManagerTest(unittest.TestCase):
+    def test_refresh_missing_repo_raises_config_error(self):
+        config = PluginConfig(path="", main=MainConfig(), repos={})
+        manager = RepositoryManager(config=config)
+
+        with self.assertRaisesRegex(ConfigError, "repository not found: missing"):
+            manager.refresh("missing")
+
     def test_needs_refresh_when_cached_arch_differs(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = RepoConfig(
