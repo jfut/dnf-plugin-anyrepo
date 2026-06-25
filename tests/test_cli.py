@@ -28,7 +28,8 @@ class CliTest(unittest.TestCase):
     def test_add_existing_repo_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
-            main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
+            with contextlib.redirect_stdout(io.StringIO()):
+                main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 result = main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
@@ -161,6 +162,36 @@ class CliTest(unittest.TestCase):
             self.assertEqual(
                 stdout.getvalue().strip(),
                 f"[main] minimum_release_age unset ({path})",
+            )
+
+    def test_refresh_missing_repo_returns_bracketed_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[main]\n")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                result = main(["--config", path, "refresh", "aaabbbccc"])
+            self.assertEqual(result, 1)
+            self.assertEqual(
+                stderr.getvalue().strip(),
+                f"[aaabbbccc] repo not found ({path})",
+            )
+
+    def test_refresh_prints_bracketed_status_message(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[nginx-module-fancyindex-rpm]\nurl = https://github.com/example/repo\n")
+            stdout = io.StringIO()
+            # Avoid provider work here and verify only the CLI output format.
+            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh", return_value=False):
+                with contextlib.redirect_stdout(stdout):
+                    result = main(["--config", path, "refresh", "nginx-module-fancyindex-rpm"])
+            self.assertEqual(result, 0)
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                f"[nginx-module-fancyindex-rpm] unchanged ({path})",
             )
 
     def test_list_prints_gpgcheck_values(self):

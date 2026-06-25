@@ -82,7 +82,7 @@ def main(argv=None):
         return 2
     try:
         return _run(args)
-    except (ConfigError, KeyError, RuntimeError, OSError) as exc:
+    except (ConfigError, RuntimeError, OSError) as exc:
         print(_format_cli_error(args, exc), file=sys.stderr)
         return 1
 
@@ -125,10 +125,12 @@ def _run(args: argparse.Namespace) -> int:
         manager = RepositoryManager(config_path=args.config)
         if args.name:
             changed = manager.refresh(args.name, force=args.force)
-            print(f"{args.name}: {'refreshed' if changed else 'unchanged'}")
+            # Keep refresh output aligned with other CLI messages and include config context.
+            _print_refresh_result(args.config, args.name, changed)
         else:
             for name, changed in manager.refresh_all(force=args.force):
-                print(f"{name}: {'refreshed' if changed else 'unchanged'}")
+                # Reuse the same display format for batch refresh output.
+                _print_refresh_result(args.config, name, changed)
         return 0
 
     if args.command == "global":
@@ -148,15 +150,14 @@ def _run(args: argparse.Namespace) -> int:
 
 def _run_repo_show(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    repo = config.repos[args.name]
+    repo = _require_repo(config, args.name)
     _print_repo_show(config, repo)
     return 0
 
 
 def _run_repo_set(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    if args.name not in config.repos:
-        raise ConfigError(f"repository not found: {args.name}")
+    _require_repo(config, args.name)
     before = _describe_current_value(args.config, args.name, args.key)
     set_value(args.config, args.name, args.key, args.value)
     _print_set_result(args.config, args.name, args.key, before, args.value)
@@ -213,6 +214,12 @@ def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
         return _format_mutation_result(args.config, f"[{name}] unknown repo key {key}")
 
     return f"dnf-anyrepo: {message}"
+
+
+def _require_repo(config, name: str):
+    if name not in config.repos:
+        raise ConfigError(f"repository not found: {name}")
+    return config.repos[name]
 
 
 def _print_list(config) -> None:
@@ -274,6 +281,12 @@ def _print_key_value(key: str, value: str) -> None:
 def _print_set_result(path: str, section: str, key: str, before: str, after: str) -> None:
     # Show the changed setting first so the important diff is easy to scan.
     _print_mutation_result(path, f"[{section}] {key}: {before} -> {after}")
+
+
+def _print_refresh_result(path: str, name: str, changed: bool) -> None:
+    # Report refresh status in the same bracketed format used by config mutations.
+    status = "refreshed" if changed else "unchanged"
+    _print_mutation_result(path, f"[{name}] {status}")
 
 
 def _print_mutation_result(path: str, message: str) -> None:

@@ -7,7 +7,7 @@ import os
 import time
 from typing import Iterable, Optional
 
-from dnf_plugin_anyrepo.config import PluginConfig, RepoConfig, load_config
+from dnf_plugin_anyrepo.config import ConfigError, PluginConfig, RepoConfig, load_config
 from dnf_plugin_anyrepo.providers.github_release import GitHubReleaseProvider
 from dnf_plugin_anyrepo.state import load_state
 
@@ -26,7 +26,7 @@ class RepositoryManager:
         return (repo for repo in self.config.repos.values() if repo.enabled)
 
     def refresh(self, name: str, force: bool = False) -> bool:
-        repo = self.config.repos[name]
+        repo = self.repo(name)
         if not repo.enabled and not force:
             return False
         if not force and not self.needs_refresh(repo):
@@ -39,6 +39,14 @@ class RepositoryManager:
             if repo.enabled or force:
                 results.append((repo.name, self.refresh(repo.name, force=force)))
         return results
+
+    def repo(self, name: str) -> RepoConfig:
+        """Return a configured repository or raise a user-facing config error."""
+
+        try:
+            return self.config.repos[name]
+        except KeyError as exc:
+            raise ConfigError(f"repository not found: {name}") from exc
 
     def needs_refresh(self, repo: RepoConfig) -> bool:
         state = load_state(repo.cache_path)
