@@ -52,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     refresh = sub.add_parser("refresh")
     refresh.add_argument("name", nargs="?")
-    refresh.add_argument("--force", action="store_true")
+    refresh.add_argument("-f", "--force", action="store_true")
 
     global_cmd = sub.add_parser("global")
     global_sub = global_cmd.add_subparsers(dest="global_command")

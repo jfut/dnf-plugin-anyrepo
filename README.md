@@ -474,12 +474,14 @@ dnf-anyrepo repo prec set gpgcheck 1
 dnf-anyrepo repo prec unset minimum_release_age
 ```
 
-Refresh and remove repositories:
+Refresh repositories:
+
+Use `-f` or `--force` to refresh the repository immediately, even when the current cache is still within `refresh_interval`.
 
 ```bash
 dnf-anyrepo refresh
 dnf-anyrepo refresh prec
-dnf-anyrepo refresh prec --force
+dnf-anyrepo refresh prec -f
 
 dnf-anyrepo remove prec --purge-cache
 ```
