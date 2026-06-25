@@ -34,7 +34,7 @@ class GitHubAPIError(ProviderError):
 
 TRANSIENT_HTTP_STATUS = {502, 503, 504}
 EL_MARKER_RE = re.compile(
-    r"(?P<marker>\.el(?P<major>\d+)(?:[._][A-Za-z0-9]+)?)(?=\.[^.]+\.rpm$)"
+    r"(?P<marker>\.(?:module_)?el(?P<major>\d+)(?:[._][A-Za-z0-9]+)*)(?=\.[^.]+\.rpm$)"
 )
 
 

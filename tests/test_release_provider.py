@@ -126,6 +126,31 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 ["tool-1.0-1.el8.x86_64.rpm"],
             )
 
+    def test_matching_assets_excludes_older_module_release_when_exact_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp, name="nginx-module-fancyindex")
+            config.asset_regex = r"\.rpm$"
+            config.arch = "x86_64"
+            config.releasever = "el10"
+            provider = GitHubReleaseProvider(config)
+            assets = provider._matching_assets(
+                {
+                    "assets": [
+                        {"name": "nginx-module-fancyindex-0.5.2-8.el10.x86_64.rpm"},
+                        {"name": "nginx-module-fancyindex-0.5.2-8.module_el9.1.26.x86_64.rpm"},
+                        {"name": "nginx-module-fancyindex-debuginfo-0.5.2-8.el10.x86_64.rpm"},
+                        {"name": "nginx-module-fancyindex-debuginfo-0.5.2-8.module_el9.1.26.x86_64.rpm"},
+                    ]
+                }
+            )
+            self.assertEqual(
+                [asset["name"] for asset in assets],
+                [
+                    "nginx-module-fancyindex-0.5.2-8.el10.x86_64.rpm",
+                    "nginx-module-fancyindex-debuginfo-0.5.2-8.el10.x86_64.rpm",
+                ],
+            )
+
     def test_request_json_retries_transient_http_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))
