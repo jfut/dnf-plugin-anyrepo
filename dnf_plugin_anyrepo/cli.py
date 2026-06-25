@@ -25,6 +25,18 @@ from dnf_plugin_anyrepo.dnf_plugin import repo_switch_gpgcheck
 from dnf_plugin_anyrepo.manager import RepositoryManager
 
 
+GLOBAL_REFRESH_KEYS = {"minimum_release_age"}
+REPO_REFRESH_KEYS = {
+    "asset_regex",
+    "arch",
+    "github_token_file",
+    "minimum_release_age",
+    "releasever",
+    "source",
+    "url",
+}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dnf-anyrepo")
     parser.add_argument("--config", default=DEFAULT_CONFIG_PATH)
@@ -161,11 +173,13 @@ def _run_repo_set(args: argparse.Namespace) -> int:
     before = _describe_current_value(args.config, args.name, args.key)
     set_value(args.config, args.name, args.key, args.value)
     _print_set_result(args.config, args.name, args.key, before, args.value)
+    _refresh_repo_after_config_change(args.config, args.name, args.key)
     return 0
 
 
 def _run_repo_unset(args: argparse.Namespace) -> int:
     removed = unset_value(args.config, args.name, args.key)
+    _refresh_repo_after_config_change(args.config, args.name, args.key)
     verb = "unset" if removed else "not set"
     _print_mutation_result(args.config, f"[{args.name}] {args.key} {verb}")
     return 0
@@ -186,9 +200,11 @@ def _run_global_config(args: argparse.Namespace) -> int:
         before = _describe_current_value(args.config, "main", args.key)
         set_value(args.config, "main", args.key, args.value)
         _print_set_result(args.config, "main", args.key, before, args.value)
+        _refresh_all_after_global_config_change(args.config, args.key)
         return 0
     if args.global_command == "unset":
         removed = unset_value(args.config, "main", args.key)
+        _refresh_all_after_global_config_change(args.config, args.key)
         verb = "unset" if removed else "not set"
         _print_mutation_result(args.config, f"[main] {args.key} {verb}")
         return 0
@@ -212,6 +228,10 @@ def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
         section, _, key = message.partition("] unknown repository key: ")
         name = section.removeprefix("[")
         return _format_mutation_result(args.config, f"[{name}] unknown repo key {key}")
+    if ": " in message:
+        name, detail = message.split(": ", 1)
+        if name and "[" not in name and "]" not in name:
+            return f"ERROR: [{name}]: {detail}"
 
     return f"dnf-anyrepo: {message}"
 
@@ -354,6 +374,22 @@ def _format_display_value(key: str, value, inherited: bool = False) -> str:
 def _format_inherited_gpgcheck() -> str:
     # gpgcheck is inherited from the user-facing anyrepo.repo DNF switch.
     return f"global({1 if repo_switch_gpgcheck() else 0})"
+
+
+def _refresh_repo_after_config_change(path: str, name: str, key: str) -> None:
+    # Refresh only when the updated setting can change the cached repository contents.
+    if key not in REPO_REFRESH_KEYS:
+        return
+    manager = RepositoryManager(config_path=path)
+    manager.refresh(name, force=True)
+
+
+def _refresh_all_after_global_config_change(path: str, key: str) -> None:
+    # Refresh all only for global settings that can change cached repository contents.
+    if key not in GLOBAL_REFRESH_KEYS:
+        return
+    manager = RepositoryManager(config_path=path)
+    manager.refresh_all(force=True)
 
 
 if __name__ == "__main__":

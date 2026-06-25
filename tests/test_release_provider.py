@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 import urllib.error
+import io
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -206,6 +207,26 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 ):
                     release = provider._fetch_latest_release()
             self.assertEqual(release["tag_name"], "v1")
+
+    def test_request_json_includes_github_error_message(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            error = urllib.error.HTTPError(
+                url="https://api.github.com/repos/jfut/prec/releases/latest",
+                code=403,
+                msg="Forbidden",
+                hdrs=None,
+                fp=io.BytesIO(
+                    b'{"message":"API rate limit exceeded for 203.0.113.10.","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}'
+                ),
+            )
+            with mock.patch("urllib.request.urlopen", side_effect=error):
+                with self.assertRaises(ProviderError) as ctx:
+                    provider._request_json("https://api.github.com/repos/jfut/prec/releases/latest")
+            self.assertEqual(
+                str(ctx.exception),
+                "prec: GitHub API returned HTTP 403: API rate limit exceeded for 203.0.113.10.",
+            )
 
     def test_replace_cache_keeps_existing_cache_on_download_failure(self):
         with tempfile.TemporaryDirectory() as tmp:

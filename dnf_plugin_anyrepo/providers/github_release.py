@@ -10,6 +10,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import json
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Mapping, Optional
@@ -221,8 +222,6 @@ class GitHubReleaseProvider:
         os.replace(tmp, destination)
 
     def _request_json(self, url: str) -> Any:
-        import json
-
         delay = 1.0
         for attempt in range(3):
             request = urllib.request.Request(url, headers=self._headers())
@@ -235,7 +234,7 @@ class GitHubReleaseProvider:
                     delay *= 2
                     continue
                 raise GitHubAPIError(
-                    f"{self.config.name}: GitHub API returned HTTP {exc.code}",
+                    self._format_http_error_message(exc),
                     status_code=exc.code,
                     transient=exc.code in TRANSIENT_HTTP_STATUS,
                 ) from exc
@@ -248,6 +247,33 @@ class GitHubReleaseProvider:
                     f"{self.config.name}: GitHub API request failed: {exc}",
                     transient=True,
                 ) from exc
+
+    def _format_http_error_message(self, exc: urllib.error.HTTPError) -> str:
+        # Include GitHub's response body so API failures such as rate limits are actionable.
+        detail = self._read_http_error_detail(exc)
+        message = f"{self.config.name}: GitHub API returned HTTP {exc.code}"
+        if detail:
+            return f"{message}: {detail}"
+        return message
+
+    def _read_http_error_detail(self, exc: urllib.error.HTTPError) -> str:
+        if exc.fp is None:
+            return ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace").strip()
+        except OSError:
+            return ""
+        if not body:
+            return ""
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            return " ".join(body.split())
+        if isinstance(payload, dict):
+            message = str(payload.get("message", "")).strip()
+            if message:
+                return message
+        return " ".join(body.split())
 
     def _headers(self) -> Dict[str, str]:
         headers = {
