@@ -441,7 +441,6 @@ The plugin's responsibility is limited to turning remote release assets into a n
 Add repositories:
 
 ```bash
-# basic
 dnf-anyrepo add https://github.com/jfut/prec
 dnf-anyrepo add https://github.com/firehol/packages -n firehol
 
@@ -450,12 +449,15 @@ dnf-anyrepo add https://github.com/jfut/prec --asset-regex '.*\.rpm$'
 dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 30m
 dnf-anyrepo add https://github.com/jfut/prec --arch x86_64 --releasever el10
 dnf-anyrepo add https://github.com/jfut/prec --github-token-file /etc/anyrepo/github.token
+```
 
-# list
+List repositories:
+
+```bash
 dnf-anyrepo list
 ```
 
-Global configuration:
+Global settings:
 
 ```bash
 dnf-anyrepo global
@@ -464,7 +466,7 @@ dnf-anyrepo global set minimum_release_age 1h
 dnf-anyrepo global unset minimum_release_age
 ```
 
-Update repository settings:
+Repository settings:
 
 ```bash
 dnf-anyrepo repo prec
@@ -482,8 +484,15 @@ Use `-f` or `--force` to refresh the repository immediately, even when the curre
 dnf-anyrepo refresh
 dnf-anyrepo refresh prec
 dnf-anyrepo refresh prec -f
+```
 
-dnf-anyrepo remove prec --purge-cache
+Remove repositories:
+
+Use `-p` or `--purge-cache` to remove the repository cache directory together with the repository entry.
+
+```bash
+dnf-anyrepo remove prec
+dnf-anyrepo remove prec -p
 ```
 
 ## Development
@@ -493,6 +502,7 @@ Common local tasks:
 ```bash
 just lint
 just test
+just test-e2e
 just exec-test
 just check
 just snapshot

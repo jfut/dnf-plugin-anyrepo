@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     remove = sub.add_parser("remove")
     remove.add_argument("name")
-    remove.add_argument("--purge-cache", action="store_true")
+    remove.add_argument("-p", "--purge-cache", action="store_true")
 
     sub.add_parser("list")
 
