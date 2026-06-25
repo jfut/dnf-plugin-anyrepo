@@ -25,7 +25,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo added ({path})")
 
-    def test_add_existing_repo_prints_config_path(self):
+    def test_add_existing_repo_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
@@ -35,7 +35,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertEqual(
                 stderr.getvalue().strip(),
-                f"{path}: Repository already exists [{SSL_CERT_REPO}]",
+                f"[{SSL_CERT_REPO}] repo already exists ({path})",
             )
 
     def test_remove_prints_config_path_after_message(self):
@@ -55,7 +55,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo removed ({path})")
 
-    def test_unset_prints_config_path(self):
+    def test_unset_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
@@ -72,7 +72,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"{path}: Unset [{SSL_CERT_REPO}] minimum_release_age",
+                f"[{SSL_CERT_REPO}] minimum_release_age unset ({path})",
             )
 
     def test_add_with_name_uses_alias_for_later_set(self):
@@ -149,7 +149,7 @@ class CliTest(unittest.TestCase):
                 ),
             )
 
-    def test_global_unset_prints_config_path(self):
+    def test_global_unset_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
@@ -160,7 +160,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"{path}: Unset [main] minimum_release_age",
+                f"[main] minimum_release_age unset ({path})",
             )
 
     def test_list_prints_gpgcheck_values(self):
@@ -291,7 +291,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertEqual(
                 stderr.getvalue().strip(),
-                f"{path}: Repository not found [missing]",
+                f"[missing] repo not found ({path})",
             )
 
     def test_set_unknown_repo_key_returns_error(self):
@@ -310,7 +310,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertEqual(
                 stderr.getvalue().strip(),
-                f"{path}: Unknown repository key [nmcli-cli] unknown_key",
+                f"[nmcli-cli] unknown repo key unknown_key ({path})",
             )
 
 

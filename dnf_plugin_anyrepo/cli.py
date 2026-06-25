@@ -165,9 +165,8 @@ def _run_repo_set(args: argparse.Namespace) -> int:
 
 def _run_repo_unset(args: argparse.Namespace) -> int:
     removed = unset_value(args.config, args.name, args.key)
-    # Keep mutation output consistent with add/remove/set.
-    verb = "Unset" if removed else "Not set"
-    print(f"{args.config}: {verb} [{args.name}] {args.key}")
+    verb = "unset" if removed else "not set"
+    _print_mutation_result(args.config, f"[{args.name}] {args.key} {verb}")
     return 0
 
 
@@ -189,9 +188,8 @@ def _run_global_config(args: argparse.Namespace) -> int:
         return 0
     if args.global_command == "unset":
         removed = unset_value(args.config, "main", args.key)
-        # Keep mutation output consistent with add/remove/set.
-        verb = "Unset" if removed else "Not set"
-        print(f"{args.config}: {verb} [main] {args.key}")
+        verb = "unset" if removed else "not set"
+        _print_mutation_result(args.config, f"[main] {args.key} {verb}")
         return 0
     raise ConfigError(f"unknown global command: {args.global_command}")
 
@@ -199,21 +197,20 @@ def _run_global_config(args: argparse.Namespace) -> int:
 def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
     message = str(exc)
 
-    # Normalize common repository errors so they match the config-prefixed style
-    # used by successful mutating commands.
+    # Normalize common config errors so the changed item stays easy to scan.
     if message.startswith("repository already exists: "):
         name = message.removeprefix("repository already exists: ")
-        return f"{args.config}: Repository already exists [{name}]"
+        return _format_mutation_result(args.config, f"[{name}] repo already exists")
     if message.startswith("repository not found: "):
         name = message.removeprefix("repository not found: ")
-        return f"{args.config}: Repository not found [{name}]"
+        return _format_mutation_result(args.config, f"[{name}] repo not found")
     if message.startswith("unknown main key: "):
         key = message.removeprefix("unknown main key: ")
-        return f"{args.config}: Unknown main key [{key}]"
+        return _format_mutation_result(args.config, f"[main] unknown key {key}")
     if "] unknown repository key: " in message:
         section, _, key = message.partition("] unknown repository key: ")
         name = section.removeprefix("[")
-        return f"{args.config}: Unknown repository key [{name}] {key}"
+        return _format_mutation_result(args.config, f"[{name}] unknown repo key {key}")
 
     return f"dnf-anyrepo: {message}"
 
@@ -281,7 +278,11 @@ def _print_set_result(path: str, section: str, key: str, before: str, after: str
 
 def _print_mutation_result(path: str, message: str) -> None:
     # Keep the changed item first and leave the source config path as context.
-    print(f"{message} ({path})")
+    print(_format_mutation_result(path, message))
+
+
+def _format_mutation_result(path: str, message: str) -> str:
+    return f"{message} ({path})"
 
 
 def _format_repo_config_value(config, repo, key: str) -> str:
