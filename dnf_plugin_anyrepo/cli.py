@@ -4,7 +4,6 @@
 """Command line management tool for AnyRepo-managed DNF repositories."""
 
 import argparse
-import configparser
 import sys
 
 from dnf_plugin_anyrepo import repo as local_repo
@@ -17,6 +16,8 @@ from dnf_plugin_anyrepo.config import (
     load_config,
     remove_section,
     repo_name_from_url,
+    repo_config_path,
+    section_options,
     set_value,
     unset_value,
     validate_repo_name,
@@ -113,19 +114,19 @@ def _run(args: argparse.Namespace) -> int:
         if args.disabled:
             values["enabled"] = "false"
         name = validate_repo_name(args.name) if args.name else repo_name_from_url(args.url)
-        add_repo(args.config, name, args.url, args.source, values, force=args.force)
-        _print_mutation_result(args.config, f"[{name}] repo added")
+        target_path = add_repo(args.config, name, args.url, args.source, values, force=args.force)
+        _print_mutation_result(target_path, f"[{name}] repo added")
         return 0
 
     if args.command == "remove":
         config = load_config(args.config)
         repo = config.repos.get(args.name)
-        removed = remove_section(args.config, args.name)
+        removed, target_path = remove_section(args.config, args.name)
         if args.purge_cache and repo:
             local_repo.remove_cache(repo.cache_path)
         if not removed:
             raise ConfigError(f"repository not found: {args.name}")
-        _print_mutation_result(args.config, f"[{args.name}] repo removed")
+        _print_mutation_result(target_path, f"[{args.name}] repo removed")
         return 0
 
     if args.command == "list":
@@ -171,16 +172,16 @@ def _run_repo_set(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     _require_repo(config, args.name)
     before = _describe_current_value(args.config, args.name, args.key)
-    set_value(args.config, args.name, args.key, args.value)
-    _print_set_result(args.config, args.name, args.key, before, args.value)
+    target_path = set_value(args.config, args.name, args.key, args.value)
+    _print_set_result(target_path, args.name, args.key, before, args.value)
     _print_repo_refresh_hint(args.name, args.key)
     return 0
 
 
 def _run_repo_unset(args: argparse.Namespace) -> int:
-    removed = unset_value(args.config, args.name, args.key)
+    removed, target_path = unset_value(args.config, args.name, args.key)
     verb = "unset" if removed else "not set"
-    _print_mutation_result(args.config, f"[{args.name}] {args.key} {verb}")
+    _print_mutation_result(target_path, f"[{args.name}] {args.key} {verb}")
     _print_repo_refresh_hint(args.name, args.key)
     return 0
 
@@ -198,14 +199,14 @@ def _run_global_config(args: argparse.Namespace) -> int:
         return 0
     if args.global_command == "set":
         before = _describe_current_value(args.config, "main", args.key)
-        set_value(args.config, "main", args.key, args.value)
-        _print_set_result(args.config, "main", args.key, before, args.value)
+        target_path = set_value(args.config, "main", args.key, args.value)
+        _print_set_result(target_path, "main", args.key, before, args.value)
         _print_global_refresh_hint(args.key)
         return 0
     if args.global_command == "unset":
-        removed = unset_value(args.config, "main", args.key)
+        removed, target_path = unset_value(args.config, "main", args.key)
         verb = "unset" if removed else "not set"
-        _print_mutation_result(args.config, f"[main] {args.key} {verb}")
+        _print_mutation_result(target_path, f"[main] {args.key} {verb}")
         _print_global_refresh_hint(args.key)
         return 0
     raise ConfigError(f"unknown global command: {args.global_command}")
@@ -217,7 +218,7 @@ def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
     # Normalize common config errors so the changed item stays easy to scan.
     if message.startswith("repository already exists: "):
         name = message.removeprefix("repository already exists: ")
-        return _format_mutation_result(args.config, f"[{name}] repo already exists")
+        return _format_mutation_result(repo_config_path(args.config, name), f"[{name}] repo already exists")
     if message.startswith("repository not found: "):
         name = message.removeprefix("repository not found: ")
         return _format_mutation_result(args.config, f"[{name}] repo not found")
@@ -329,31 +330,29 @@ def _format_repo_config_value(config, repo, key: str) -> str:
 
 
 def _section_options(path, section):
-    parser = configparser.ConfigParser()
-    parser.read(path)
-    if not parser.has_section(section):
-        return set()
-    return set(parser[section].keys())
+    return set(section_options(path, section))
 
 
 def _describe_current_value(path: str, section: str, key: str) -> str:
+    config = load_config(path)
+
     if section == "main":
-        config = load_config(path)
         if not hasattr(config.main, key):
             return "(unset)"
         return _format_display_value(key, getattr(config.main, key))
 
-    parser = configparser.ConfigParser()
-    parser.read(path)
-    if parser.has_section(section) and parser.has_option(section, key):
-        return str(parser.get(section, key))
+    explicit_options = _section_options(path, section)
+    if key in explicit_options:
+        repo = config.repos.get(section)
+        if repo is None or not hasattr(repo, key):
+            return "(unset)"
+        return _format_display_value(key, getattr(repo, key))
 
-    config = load_config(path)
     repo = config.repos.get(section)
     if repo is None or not hasattr(repo, key):
         return "(unset)"
 
-    inherited = key not in _section_options(path, section)
+    inherited = key not in explicit_options
     if key == "gpgcheck" and inherited:
         return _format_inherited_gpgcheck()
     return _format_display_value(key, getattr(repo, key), inherited=inherited)

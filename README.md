@@ -205,7 +205,7 @@ Remove the AnyRepo repository entry:
 
 ```bash
 # dnf-anyrepo remove prec
-[prec] repo removed (/etc/dnf/plugins/anyrepo.conf)
+[prec] repo removed (/etc/dnf/plugins/anyrepo.d/prec.conf)
 ```
 
 ## DNF integration
@@ -265,26 +265,38 @@ Main config path:
 /etc/dnf/plugins/anyrepo.conf
 ```
 
+Default repository config directory:
+
+```text
+/etc/dnf/plugins/anyrepo.d
+```
+
 Example:
 
 ```ini
 [main]
+include = /etc/dnf/plugins/anyrepo.d
 cache_dir = /var/cache/dnf/anyrepo
 refresh_interval = 600
 minimum_release_age = 3d
 debug = 0
+```
 
+Example per-repository file:
+
+```ini
 [dnf-plugin-anyrepo]
 source = github-release
 url = https://github.com/jfut/dnf-plugin-anyrepo
 asset_regex = .*\.rpm$
 minimum_release_age = 1800
-
-[prec]
-source = github-release
-url = https://github.com/jfut/prec
-asset_regex = .*\.rpm$
 ```
+
+When `include` is set, AnyRepo reads every `*.conf` file under that directory.
+If `include` is not set, AnyRepo still uses `/etc/dnf/plugins/anyrepo.d` by default.
+
+`dnf-anyrepo add https://github.com/jfut/prec` creates `/etc/dnf/plugins/anyrepo.d/prec.conf` by default.
+If `-n name` is used, the file path becomes `/etc/dnf/plugins/anyrepo.d/name.conf`.
 
 Configuration values are resolved in this order:
 
@@ -450,6 +462,8 @@ dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 30m
 dnf-anyrepo add https://github.com/jfut/prec --arch x86_64 --releasever el10
 dnf-anyrepo add https://github.com/jfut/prec --github-token-file /etc/anyrepo/github.token
 ```
+
+By default, each added repository is stored in `/etc/dnf/plugins/anyrepo.d/NAME.conf`.
 
 List repositories:
 

@@ -15,19 +15,26 @@ SSL_CERT_REPO = "sslcert-cli"
 
 
 class CliTest(unittest.TestCase):
+    def _repo_path(self, directory: str, name: str) -> str:
+        # Repo-specific commands now operate on one file per repository.
+        return os.path.join(directory, "anyrepo.d", f"{name}.conf")
+
     def test_add_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, SSL_CERT_REPO)
             stdout = io.StringIO()
             # Show the added repository first, then the config file that changed.
             with contextlib.redirect_stdout(stdout):
                 result = main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo added ({path})")
+            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo added ({repo_path})")
+            self.assertTrue(os.path.isfile(repo_path))
 
     def test_add_existing_repo_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, SSL_CERT_REPO)
             with contextlib.redirect_stdout(io.StringIO()):
                 main(["--config", path, "add", "https://github.com/jfut/sslcert-cli"])
             stderr = io.StringIO()
@@ -36,33 +43,35 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertEqual(
                 stderr.getvalue().strip(),
-                f"[{SSL_CERT_REPO}] repo already exists ({path})",
+                f"[{SSL_CERT_REPO}] repo already exists ({repo_path})",
             )
 
     def test_remove_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, SSL_CERT_REPO)
+            os.makedirs(os.path.dirname(repo_path))
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write(
-                    "[main]\n"
-                    "\n"
-                    f"[{SSL_CERT_REPO}]\n"
-                    "url = https://github.com/jfut/sslcert-cli\n"
-                )
+                fh.write(f"[main]\ninclude = {os.path.join(tmp, 'anyrepo.d')}\n")
+            with open(repo_path, "w", encoding="utf-8") as fh:
+                fh.write(f"[{SSL_CERT_REPO}]\nurl = https://github.com/jfut/sslcert-cli\n")
             stdout = io.StringIO()
             # Show the removed repository first, then the config file that changed.
             with contextlib.redirect_stdout(stdout):
                 result = main(["--config", path, "remove", SSL_CERT_REPO])
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo removed ({path})")
+            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo removed ({repo_path})")
+            self.assertFalse(os.path.exists(repo_path))
 
     def test_unset_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, SSL_CERT_REPO)
+            os.makedirs(os.path.dirname(repo_path))
             with open(path, "w", encoding="utf-8") as fh:
+                fh.write(f"[main]\ninclude = {os.path.join(tmp, 'anyrepo.d')}\n")
+            with open(repo_path, "w", encoding="utf-8") as fh:
                 fh.write(
-                    "[main]\n"
-                    "\n"
                     f"[{SSL_CERT_REPO}]\n"
                     "url = https://github.com/jfut/sslcert-cli\n"
                     "minimum_release_age = 1h\n"
@@ -75,7 +84,7 @@ class CliTest(unittest.TestCase):
                 stdout.getvalue().strip(),
                 "\n".join(
                     [
-                        f"[{SSL_CERT_REPO}] minimum_release_age unset ({path})",
+                        f"[{SSL_CERT_REPO}] minimum_release_age unset ({repo_path})",
                         "",
                         "NOTICE: Run refresh immediately to apply the configuration changes.",
                         f"-> dnf-anyrepo refresh {SSL_CERT_REPO} -f",
@@ -86,6 +95,7 @@ class CliTest(unittest.TestCase):
     def test_add_with_name_uses_alias_for_later_set(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, "sslcert")
             stdout = io.StringIO()
             # Store a user-selected alias so later commands can use that short name.
             with contextlib.redirect_stdout(stdout):
@@ -100,7 +110,7 @@ class CliTest(unittest.TestCase):
                     ]
                 )
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({path})")
+            self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({repo_path})")
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -110,7 +120,7 @@ class CliTest(unittest.TestCase):
                 stdout.getvalue().strip(),
                 "\n".join(
                     [
-                        f"[sslcert] minimum_release_age: global(3d) -> 3d ({path})",
+                        f"[sslcert] minimum_release_age: global(3d) -> 3d ({repo_path})",
                         "",
                         "NOTICE: Run refresh immediately to apply the configuration changes.",
                         "-> dnf-anyrepo refresh sslcert -f",
@@ -121,6 +131,7 @@ class CliTest(unittest.TestCase):
     def test_add_with_short_name_uses_alias(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, "sslcert")
             stdout = io.StringIO()
             # Verify the short alias flag stores the same repository name as --name.
             with contextlib.redirect_stdout(stdout):
@@ -135,7 +146,7 @@ class CliTest(unittest.TestCase):
                     ]
                 )
             self.assertEqual(result, 0)
-            self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({path})")
+            self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({repo_path})")
 
     def test_global_show_prints_main_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -239,7 +250,11 @@ class CliTest(unittest.TestCase):
     def test_repo_set_prints_refresh_hint_for_refreshable_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, "firehol")
+            os.makedirs(os.path.dirname(repo_path))
             with open(path, "w", encoding="utf-8") as fh:
+                fh.write(f"[main]\ninclude = {os.path.join(tmp, 'anyrepo.d')}\n")
+            with open(repo_path, "w", encoding="utf-8") as fh:
                 fh.write("[firehol]\nurl = https://github.com/firehol/firehol\nminimum_release_age = 1h\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -249,7 +264,7 @@ class CliTest(unittest.TestCase):
                 stdout.getvalue().strip(),
                 "\n".join(
                     [
-                        f"[firehol] minimum_release_age: 1h -> 0s ({path})",
+                        f"[firehol] minimum_release_age: 1h -> 0s ({repo_path})",
                         "",
                         "NOTICE: Run refresh immediately to apply the configuration changes.",
                         "-> dnf-anyrepo refresh firehol -f",
@@ -332,14 +347,16 @@ class CliTest(unittest.TestCase):
     def test_set_prints_before_and_after_values(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, "nmcli-cli")
+            os.makedirs(os.path.dirname(repo_path))
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(
                     "[main]\n"
+                    f"include = {os.path.join(tmp, 'anyrepo.d')}\n"
                     "minimum_release_age = 3d\n"
-                    "\n"
-                    "[nmcli-cli]\n"
-                    "url = https://github.com/jfut/nmcli-cli\n"
                 )
+            with open(repo_path, "w", encoding="utf-8") as fh:
+                fh.write("[nmcli-cli]\nurl = https://github.com/jfut/nmcli-cli\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 result = main(["--config", path, "repo", "nmcli-cli", "set", "minimum_release_age", "1h"])
@@ -348,7 +365,7 @@ class CliTest(unittest.TestCase):
                 stdout.getvalue().strip(),
                 "\n".join(
                     [
-                        f"[nmcli-cli] minimum_release_age: global(3d) -> 1h ({path})",
+                        f"[nmcli-cli] minimum_release_age: global(3d) -> 1h ({repo_path})",
                         "",
                         "NOTICE: Run refresh immediately to apply the configuration changes.",
                         "-> dnf-anyrepo refresh nmcli-cli -f",
@@ -359,7 +376,11 @@ class CliTest(unittest.TestCase):
     def test_set_gpgcheck_prints_inherited_before_value(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, "prec")
+            os.makedirs(os.path.dirname(repo_path))
             with open(path, "w", encoding="utf-8") as fh:
+                fh.write(f"[main]\ninclude = {os.path.join(tmp, 'anyrepo.d')}\n")
+            with open(repo_path, "w", encoding="utf-8") as fh:
                 fh.write("[prec]\nurl = https://github.com/jfut/prec\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -367,7 +388,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[prec] gpgcheck: global(0) -> 0 ({path})",
+                f"[prec] gpgcheck: global(0) -> 0 ({repo_path})",
             )
 
     def test_global_set_prints_refresh_hint_only_once(self):

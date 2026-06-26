@@ -9,6 +9,7 @@ from unittest import mock
 from dnf_plugin_anyrepo.config import (
     ConfigError,
     add_repo,
+    default_include_path,
     load_config,
     parse_duration,
     parse_github_url,
@@ -66,9 +67,12 @@ class ConfigTest(unittest.TestCase):
     def test_add_repo(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
-            add_repo(path, "prec", "https://github.com/jfut/prec")
+            target_path = add_repo(path, "prec", "https://github.com/jfut/prec")
             config = load_config(path)
             self.assertIn("prec", config.repos)
+            self.assertEqual(target_path, os.path.join(tmp, "anyrepo.d", "prec.conf"))
+            with open(path, "r", encoding="utf-8") as fh:
+                self.assertIn(f"include = {default_include_path(path)}", fh.read())
 
     def test_repo_name_from_url_uses_repo_name(self):
         self.assertEqual(
@@ -99,8 +103,35 @@ class ConfigTest(unittest.TestCase):
                 os.chdir(tmp)
                 add_repo("anyrepo.conf", "prec", "https://github.com/jfut/prec")
                 self.assertTrue(os.path.isfile("anyrepo.conf"))
+                self.assertTrue(os.path.isfile(os.path.join("anyrepo.d", "prec.conf")))
             finally:
                 os.chdir(cwd)
+
+    def test_load_config_reads_repo_from_included_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            include_dir = os.path.join(tmp, "custom.d")
+            os.makedirs(include_dir)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[main]\ninclude = custom.d\nminimum_release_age = 1h\n")
+            with open(os.path.join(include_dir, "prec.conf"), "w", encoding="utf-8") as fh:
+                fh.write("[prec]\nurl = https://github.com/jfut/prec\n")
+            config = load_config(path)
+            self.assertIn("prec", config.repos)
+            self.assertEqual(config.repos["prec"].minimum_release_age, 3600)
+
+    def test_load_config_uses_default_include_directory_when_unset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            include_dir = os.path.join(tmp, "anyrepo.d")
+            os.makedirs(include_dir)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[main]\nminimum_release_age = 1h\n")
+            with open(os.path.join(include_dir, "prec.conf"), "w", encoding="utf-8") as fh:
+                fh.write("[prec]\nurl = https://github.com/jfut/prec\n")
+            config = load_config(path)
+            self.assertIn("prec", config.repos)
+            self.assertEqual(config.repos["prec"].minimum_release_age, 3600)
 
     def test_rejects_unsupported_source_before_write(self):
         with tempfile.TemporaryDirectory() as tmp:

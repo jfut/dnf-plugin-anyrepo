@@ -4,15 +4,17 @@
 """Configuration loading and mutation for dnf-plugin-anyrepo."""
 
 import configparser
+import glob
 import os
 import platform
 import re
 import subprocess
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
 
 DEFAULT_CONFIG_PATH = "/etc/dnf/plugins/anyrepo.conf"
+INCLUDE_KEY = "include"
 DEFAULT_CACHE_DIR = "/var/cache/dnf/anyrepo"
 DEFAULT_REFRESH_INTERVAL = 600
 DEFAULT_MINIMUM_RELEASE_AGE = 3 * 86400
@@ -25,6 +27,7 @@ MAIN_CONFIG_KEYS = {
     "refresh_interval",
     "minimum_release_age",
     "debug",
+    INCLUDE_KEY,
 }
 REPO_CONFIG_KEYS = {
     "source",
@@ -54,11 +57,13 @@ class MainConfig:
         refresh_interval=DEFAULT_REFRESH_INTERVAL,
         minimum_release_age=DEFAULT_MINIMUM_RELEASE_AGE,
         debug=DEFAULT_DEBUG,
+        include=None,
     ):
         self.cache_dir = cache_dir
         self.refresh_interval = refresh_interval
         self.minimum_release_age = minimum_release_age
         self.debug = debug
+        self.include = include
 
 
 class RepoConfig:
@@ -100,10 +105,11 @@ class RepoConfig:
 
 
 class PluginConfig:
-    def __init__(self, path, main, repos):
+    def __init__(self, path, main, repos, section_files=None):
         self.path = path
         self.main = main
         self.repos = repos
+        self.section_files = section_files or {}
 
 
 def validate_main_value(key: str, value: object) -> None:
@@ -170,6 +176,86 @@ def reject_unknown_options(section: str, keys: Iterable[str]) -> None:
         if section == "main":
             raise ConfigError(f"unknown main key: {key}")
         raise ConfigError(f"[{section}] unknown repository key: {key}")
+
+
+def default_include_path(path: str) -> str:
+    """Derive the default include directory from the main config path."""
+
+    directory = os.path.dirname(path)
+    stem, _ = os.path.splitext(os.path.basename(path))
+    return os.path.join(directory, f"{stem}.d")
+
+
+def resolve_include_path(config_path: str, include_path: str) -> str:
+    """Resolve relative include paths against the main config directory."""
+
+    if os.path.isabs(include_path):
+        return os.path.normpath(include_path)
+    base_directory = os.path.dirname(config_path) or "."
+    return os.path.normpath(os.path.join(base_directory, include_path))
+
+
+def configured_include_path(
+    path: str,
+    parser: Optional[configparser.ConfigParser] = None,
+    use_default_if_missing: bool = False,
+) -> Optional[str]:
+    """Return the include directory configured in [main]."""
+
+    current = parser or read_parser(path, include=False, ensure_main=False)
+    if current.has_section("main") and current.has_option("main", INCLUDE_KEY):
+        include_path = current.get("main", INCLUDE_KEY).strip()
+        if not include_path:
+            return None
+        return resolve_include_path(path, include_path)
+    if use_default_if_missing:
+        return default_include_path(path)
+    return None
+
+
+def ensure_main_defaults(parser: configparser.ConfigParser, path: str) -> None:
+    """Keep the main file on the new include-based layout."""
+
+    if not parser.has_section("main"):
+        parser.add_section("main")
+    if not parser.has_option("main", INCLUDE_KEY):
+        parser.set("main", INCLUDE_KEY, default_include_path(path))
+
+
+def read_parser(
+    path: str = DEFAULT_CONFIG_PATH,
+    include: bool = True,
+    ensure_main: bool = True,
+) -> configparser.ConfigParser:
+    """Read the main config and optionally merge included repo files."""
+
+    parser = configparser.ConfigParser()
+    paths = [path]
+    if include:
+        base = configparser.ConfigParser()
+        base.read(path)
+        include_path = configured_include_path(path, base, use_default_if_missing=True)
+        if include_path:
+            paths.extend(sorted(glob.glob(os.path.join(include_path, "*.conf"))))
+    parser.read(paths)
+    if ensure_main and not parser.has_section("main"):
+        parser.add_section("main")
+    return parser
+
+
+def _read_config_layers(path: str) -> List[Tuple[str, configparser.ConfigParser]]:
+    """Read the base config plus each included repo file as separate layers."""
+
+    layers = []
+    base = read_parser(path, include=False, ensure_main=False)
+    layers.append((path, base))
+    include_path = configured_include_path(path, base, use_default_if_missing=True)
+    if not include_path:
+        return layers
+    for include_file in sorted(glob.glob(os.path.join(include_path, "*.conf"))):
+        parser = read_parser(include_file, include=False, ensure_main=False)
+        layers.append((include_file, parser))
+    return layers
 
 
 def parse_duration(value: object) -> int:
@@ -289,8 +375,7 @@ def repo_name_from_url(url: str) -> str:
 
 
 def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
-    parser = configparser.ConfigParser()
-    parser.read(path)
+    parser = read_parser(path)
 
     main_section = parser["main"] if parser.has_section("main") else {}
     reject_unknown_options("main", main_section.keys())
@@ -301,9 +386,16 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
             main_section.get("minimum_release_age", DEFAULT_MINIMUM_RELEASE_AGE)
         ),
         debug=parse_bool(main_section.get("debug", DEFAULT_DEBUG)),
+        include=main_section.get(INCLUDE_KEY),
     )
 
     repos: Dict[str, RepoConfig] = {}
+    section_files: Dict[str, str] = {}
+    for layer_path, layer_parser in _read_config_layers(path):
+        for section in layer_parser.sections():
+            if section == "main":
+                continue
+            section_files[section] = layer_path
     for section in parser.sections():
         if section == "main":
             continue
@@ -336,15 +428,7 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
             github_token_file=item.get("github_token_file"),
             gpgcheck=gpgcheck,
         )
-    return PluginConfig(path=path, main=main, repos=repos)
-
-
-def read_parser(path: str = DEFAULT_CONFIG_PATH) -> configparser.ConfigParser:
-    parser = configparser.ConfigParser()
-    parser.read(path)
-    if not parser.has_section("main"):
-        parser.add_section("main")
-    return parser
+    return PluginConfig(path=path, main=main, repos=repos, section_files=section_files)
 
 
 def write_parser(parser: configparser.ConfigParser, path: str = DEFAULT_CONFIG_PATH) -> None:
@@ -355,27 +439,74 @@ def write_parser(parser: configparser.ConfigParser, path: str = DEFAULT_CONFIG_P
         parser.write(fh)
 
 
-def set_value(path: str, section: str, key: str, value: object) -> None:
+def repo_config_path(path: str, section: str) -> str:
+    """Resolve which file stores the named repository section."""
+
+    config = load_config(path)
+    source_path = config.section_files.get(section)
+    if source_path:
+        return source_path
+    include_path = configured_include_path(path, use_default_if_missing=True)
+    if not include_path:
+        return path
+    return os.path.join(include_path, f"{section}.conf")
+
+
+def section_options(path: str, section: str) -> Iterable[str]:
+    """Return the explicitly configured keys for one section."""
+
+    source_path = path if section == "main" else repo_config_path(path, section)
+    parser = read_parser(source_path, include=False, ensure_main=False)
+    if not parser.has_section(section):
+        return set()
+    return set(parser[section].keys())
+
+
+def set_value(path: str, section: str, key: str, value: object) -> str:
     validate_config_value(section, key, value)
-    parser = read_parser(path)
+    target_path = path
+    if section == "main":
+        parser = read_parser(path, include=False)
+        ensure_main_defaults(parser, path)
+    else:
+        target_path = repo_config_path(path, section)
+        parser = read_parser(target_path, include=False, ensure_main=False)
     if not parser.has_section(section):
         parser.add_section(section)
     parser.set(section, key, str(value))
-    write_parser(parser, path)
+    write_parser(parser, target_path)
+    return target_path
 
 
-def unset_value(path: str, section: str, key: str) -> bool:
-    parser = read_parser(path)
+def unset_value(path: str, section: str, key: str) -> Tuple[bool, str]:
+    target_path = path
+    if section == "main":
+        parser = read_parser(path, include=False)
+        ensure_main_defaults(parser, path)
+    else:
+        target_path = repo_config_path(path, section)
+        parser = read_parser(target_path, include=False, ensure_main=False)
     removed = parser.has_section(section) and parser.remove_option(section, key)
-    write_parser(parser, path)
-    return removed
+    write_parser(parser, target_path)
+    return removed, target_path
 
 
-def remove_section(path: str, section: str) -> bool:
-    parser = read_parser(path)
+def remove_section(path: str, section: str) -> Tuple[bool, str]:
+    target_path = path if section == "main" else repo_config_path(path, section)
+    parser = read_parser(
+        target_path,
+        include=False,
+        ensure_main=(target_path == path),
+    )
+    if target_path == path:
+        ensure_main_defaults(parser, path)
     removed = parser.remove_section(section)
-    write_parser(parser, path)
-    return removed
+    if target_path != path and removed and not parser.sections():
+        if os.path.exists(target_path):
+            os.unlink(target_path)
+        return removed, target_path
+    write_parser(parser, target_path)
+    return removed, target_path
 
 
 def add_repo(
@@ -385,7 +516,7 @@ def add_repo(
     source: str = DEFAULT_SOURCE,
     values: Optional[Dict[str, object]] = None,
     force: bool = False,
-) -> None:
+) -> str:
     """Persist a repository section generated by the management CLI."""
 
     name = validate_repo_name(name)
@@ -394,7 +525,11 @@ def add_repo(
     for key, value in (values or {}).items():
         if value is not None:
             validate_repo_value(name, key, value)
-    parser = read_parser(path)
+    main_parser = read_parser(path, include=False)
+    ensure_main_defaults(main_parser, path)
+    write_parser(main_parser, path)
+    target_path = repo_config_path(path, name)
+    parser = read_parser(target_path, include=False, ensure_main=False)
     if parser.has_section(name):
         if not force:
             raise ConfigError(f"repository already exists: {name}")
@@ -405,7 +540,8 @@ def add_repo(
     for key, value in (values or {}).items():
         if value is not None:
             parser.set(name, key, str(value))
-    write_parser(parser, path)
+    write_parser(parser, target_path)
+    return target_path
 
 
 def iter_repo_rows(config: PluginConfig) -> Iterable[RepoConfig]:
