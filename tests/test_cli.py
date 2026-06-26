@@ -68,14 +68,19 @@ class CliTest(unittest.TestCase):
                     "minimum_release_age = 1h\n"
                 )
             stdout = io.StringIO()
-            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh", return_value=False) as refresh:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "repo", SSL_CERT_REPO, "unset", "minimum_release_age"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", SSL_CERT_REPO, "unset", "minimum_release_age"])
             self.assertEqual(result, 0)
-            refresh.assert_called_once_with(SSL_CERT_REPO, force=True)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[{SSL_CERT_REPO}] minimum_release_age unset ({path})",
+                "\n".join(
+                    [
+                        f"[{SSL_CERT_REPO}] minimum_release_age unset ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        f"-> dnf-anyrepo refresh {SSL_CERT_REPO} -f",
+                    ]
+                ),
             )
 
     def test_add_with_name_uses_alias_for_later_set(self):
@@ -98,14 +103,19 @@ class CliTest(unittest.TestCase):
             self.assertEqual(stdout.getvalue().strip(), f"[sslcert] repo added ({path})")
 
             stdout = io.StringIO()
-            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh", return_value=False) as refresh:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "repo", "sslcert", "set", "minimum_release_age", "3d"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "sslcert", "set", "minimum_release_age", "3d"])
             self.assertEqual(result, 0)
-            refresh.assert_called_once_with("sslcert", force=True)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[sslcert] minimum_release_age: global(3d) -> 3d ({path})",
+                "\n".join(
+                    [
+                        f"[sslcert] minimum_release_age: global(3d) -> 3d ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh sslcert -f",
+                    ]
+                ),
             )
 
     def test_add_with_short_name_uses_alias(self):
@@ -160,14 +170,19 @@ class CliTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("[main]\nminimum_release_age = 1h\n")
             stdout = io.StringIO()
-            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh_all", return_value=[]) as refresh_all:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "global", "unset", "minimum_release_age"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "unset", "minimum_release_age"])
             self.assertEqual(result, 0)
-            refresh_all.assert_called_once_with(force=True)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[main] minimum_release_age unset ({path})",
+                "\n".join(
+                    [
+                        f"[main] minimum_release_age unset ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh -f",
+                    ]
+                ),
             )
 
     def test_refresh_missing_repo_returns_bracketed_error(self):
@@ -200,54 +215,46 @@ class CliTest(unittest.TestCase):
                 f"[nginx-module-fancyindex-rpm] unchanged ({path})",
             )
 
-    def test_global_set_formats_refresh_error_with_repo_name(self):
+    def test_global_set_prints_refresh_hint_for_refreshable_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("[main]\nminimum_release_age = 0s\n")
             stdout = io.StringIO()
-            stderr = io.StringIO()
-            with mock.patch(
-                "dnf_plugin_anyrepo.cli.RepositoryManager.refresh_all",
-                side_effect=RuntimeError(
-                    "dnf-plugin-anyrepo: GitHub API returned HTTP 403: API rate limit exceeded"
-                ),
-            ):
-                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                    result = main(["--config", path, "global", "set", "minimum_release_age", "0s"])
-            self.assertEqual(result, 1)
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "set", "minimum_release_age", "0s"])
+            self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[main] minimum_release_age: 0s -> 0s ({path})",
-            )
-            self.assertEqual(
-                stderr.getvalue().strip(),
-                "ERROR: [dnf-plugin-anyrepo]: GitHub API returned HTTP 403: API rate limit exceeded",
+                "\n".join(
+                    [
+                        f"[main] minimum_release_age: 0s -> 0s ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh -f",
+                    ]
+                ),
             )
 
-    def test_repo_set_formats_refresh_error_with_repo_name(self):
+    def test_repo_set_prints_refresh_hint_for_refreshable_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("[firehol]\nurl = https://github.com/firehol/firehol\nminimum_release_age = 1h\n")
             stdout = io.StringIO()
-            stderr = io.StringIO()
-            with mock.patch(
-                "dnf_plugin_anyrepo.cli.RepositoryManager.refresh",
-                side_effect=RuntimeError(
-                    "firehol: GitHub API returned HTTP 403: API rate limit exceeded"
-                ),
-            ):
-                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                    result = main(["--config", path, "repo", "firehol", "set", "minimum_release_age", "0s"])
-            self.assertEqual(result, 1)
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "firehol", "set", "minimum_release_age", "0s"])
+            self.assertEqual(result, 0)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[firehol] minimum_release_age: 1h -> 0s ({path})",
-            )
-            self.assertEqual(
-                stderr.getvalue().strip(),
-                "ERROR: [firehol]: GitHub API returned HTTP 403: API rate limit exceeded",
+                "\n".join(
+                    [
+                        f"[firehol] minimum_release_age: 1h -> 0s ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh firehol -f",
+                    ]
+                ),
             )
 
     def test_list_prints_gpgcheck_values(self):
@@ -334,14 +341,19 @@ class CliTest(unittest.TestCase):
                     "url = https://github.com/jfut/nmcli-cli\n"
                 )
             stdout = io.StringIO()
-            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh", return_value=False) as refresh:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "repo", "nmcli-cli", "set", "minimum_release_age", "1h"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "nmcli-cli", "set", "minimum_release_age", "1h"])
             self.assertEqual(result, 0)
-            refresh.assert_called_once_with("nmcli-cli", force=True)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[nmcli-cli] minimum_release_age: global(3d) -> 1h ({path})",
+                "\n".join(
+                    [
+                        f"[nmcli-cli] minimum_release_age: global(3d) -> 1h ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh nmcli-cli -f",
+                    ]
+                ),
             )
 
     def test_set_gpgcheck_prints_inherited_before_value(self):
@@ -350,17 +362,15 @@ class CliTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("[prec]\nurl = https://github.com/jfut/prec\n")
             stdout = io.StringIO()
-            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh", return_value=False) as refresh:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "repo", "prec", "set", "gpgcheck", "0"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "prec", "set", "gpgcheck", "0"])
             self.assertEqual(result, 0)
-            refresh.assert_not_called()
             self.assertEqual(
                 stdout.getvalue().strip(),
                 f"[prec] gpgcheck: global(0) -> 0 ({path})",
             )
 
-    def test_global_set_refreshes_all_repositories_with_force(self):
+    def test_global_set_prints_refresh_hint_only_once(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
@@ -375,17 +385,19 @@ class CliTest(unittest.TestCase):
                     "url = https://github.com/jfut/prec\n"
                 )
             stdout = io.StringIO()
-            with mock.patch(
-                "dnf_plugin_anyrepo.cli.RepositoryManager.refresh_all",
-                return_value=[("nmcli-cli", True), ("prec", False)],
-            ) as refresh_all:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "global", "set", "minimum_release_age", "1h"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "set", "minimum_release_age", "1h"])
             self.assertEqual(result, 0)
-            refresh_all.assert_called_once_with(force=True)
             self.assertEqual(
                 stdout.getvalue().strip(),
-                f"[main] minimum_release_age: 3d -> 1h ({path})",
+                "\n".join(
+                    [
+                        f"[main] minimum_release_age: 3d -> 1h ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh -f",
+                    ]
+                ),
             )
 
     def test_global_set_debug_does_not_refresh(self):
@@ -394,11 +406,9 @@ class CliTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("[main]\ndebug = false\n")
             stdout = io.StringIO()
-            with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager.refresh_all", return_value=[]) as refresh_all:
-                with contextlib.redirect_stdout(stdout):
-                    result = main(["--config", path, "global", "set", "debug", "true"])
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "set", "debug", "true"])
             self.assertEqual(result, 0)
-            refresh_all.assert_not_called()
             self.assertEqual(
                 stdout.getvalue().strip(),
                 f"[main] debug: false -> true ({path})",

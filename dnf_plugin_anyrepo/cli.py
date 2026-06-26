@@ -173,15 +173,15 @@ def _run_repo_set(args: argparse.Namespace) -> int:
     before = _describe_current_value(args.config, args.name, args.key)
     set_value(args.config, args.name, args.key, args.value)
     _print_set_result(args.config, args.name, args.key, before, args.value)
-    _refresh_repo_after_config_change(args.config, args.name, args.key)
+    _print_repo_refresh_hint(args.name, args.key)
     return 0
 
 
 def _run_repo_unset(args: argparse.Namespace) -> int:
     removed = unset_value(args.config, args.name, args.key)
-    _refresh_repo_after_config_change(args.config, args.name, args.key)
     verb = "unset" if removed else "not set"
     _print_mutation_result(args.config, f"[{args.name}] {args.key} {verb}")
+    _print_repo_refresh_hint(args.name, args.key)
     return 0
 
 
@@ -200,13 +200,13 @@ def _run_global_config(args: argparse.Namespace) -> int:
         before = _describe_current_value(args.config, "main", args.key)
         set_value(args.config, "main", args.key, args.value)
         _print_set_result(args.config, "main", args.key, before, args.value)
-        _refresh_all_after_global_config_change(args.config, args.key)
+        _print_global_refresh_hint(args.key)
         return 0
     if args.global_command == "unset":
         removed = unset_value(args.config, "main", args.key)
-        _refresh_all_after_global_config_change(args.config, args.key)
         verb = "unset" if removed else "not set"
         _print_mutation_result(args.config, f"[main] {args.key} {verb}")
+        _print_global_refresh_hint(args.key)
         return 0
     raise ConfigError(f"unknown global command: {args.global_command}")
 
@@ -376,20 +376,22 @@ def _format_inherited_gpgcheck() -> str:
     return f"global({1 if repo_switch_gpgcheck() else 0})"
 
 
-def _refresh_repo_after_config_change(path: str, name: str, key: str) -> None:
-    # Refresh only when the updated setting can change the cached repository contents.
+def _print_repo_refresh_hint(name: str, key: str) -> None:
+    # Explain the skipped auto-refresh, then print the exact follow-up command.
     if key not in REPO_REFRESH_KEYS:
         return
-    manager = RepositoryManager(config_path=path)
-    manager.refresh(name, force=True)
+    print()
+    print("NOTICE: Run refresh immediately to apply the configuration changes.")
+    print(f"-> dnf-anyrepo refresh {name} -f")
 
 
-def _refresh_all_after_global_config_change(path: str, key: str) -> None:
-    # Refresh all only for global settings that can change cached repository contents.
+def _print_global_refresh_hint(key: str) -> None:
+    # Explain the skipped auto-refresh, then print the exact follow-up command.
     if key not in GLOBAL_REFRESH_KEYS:
         return
-    manager = RepositoryManager(config_path=path)
-    manager.refresh_all(force=True)
+    print()
+    print("NOTICE: Run refresh immediately to apply the configuration changes.")
+    print("-> dnf-anyrepo refresh -f")
 
 
 if __name__ == "__main__":
