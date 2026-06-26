@@ -228,6 +228,68 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 "prec: GitHub API returned HTTP 403: API rate limit exceeded for 203.0.113.10.",
             )
 
+    def test_request_json_appends_rate_limit_reset_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            error = urllib.error.HTTPError(
+                url="https://api.github.com/repos/jfut/prec/releases/latest",
+                code=403,
+                msg="Forbidden",
+                hdrs=None,
+                fp=io.BytesIO(
+                    b'{"message":"API rate limit exceeded for 203.0.113.10.","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}'
+                ),
+            )
+            rate_limit_response = mock.Mock()
+            rate_limit_response.read.return_value = (
+                b'{"rate":{"limit":60,"remaining":37,"reset":1782456927,"used":23,"resource":"core"}}'
+            )
+            rate_limit_response.__enter__ = mock.Mock(return_value=rate_limit_response)
+            rate_limit_response.__exit__ = mock.Mock(return_value=False)
+            with mock.patch(
+                "urllib.request.urlopen",
+                side_effect=[error, rate_limit_response],
+            ):
+                with self.assertRaises(ProviderError) as ctx:
+                    provider._request_json("https://api.github.com/repos/jfut/prec/releases/latest")
+            expected_reset_at = (
+                datetime.fromtimestamp(1782456927, tz=timezone.utc)
+                .astimezone()
+                .strftime("%Y-%m-%d %H:%M:%S %Z")
+            )
+            self.assertEqual(
+                str(ctx.exception),
+                f"prec: GitHub API returned HTTP 403: API rate limit exceeded for 203.0.113.10. The rate limit will reset at {expected_reset_at}.",
+            )
+
+    def test_request_json_ignores_rate_limit_reset_lookup_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            error = urllib.error.HTTPError(
+                url="https://api.github.com/repos/jfut/prec/releases/latest",
+                code=403,
+                msg="Forbidden",
+                hdrs=None,
+                fp=io.BytesIO(b'{"message":"API rate limit exceeded."}'),
+            )
+            rate_limit_error = urllib.error.HTTPError(
+                url="https://api.github.com/rate_limit",
+                code=403,
+                msg="Forbidden",
+                hdrs=None,
+                fp=io.BytesIO(b""),
+            )
+            with mock.patch(
+                "urllib.request.urlopen",
+                side_effect=[error, rate_limit_error],
+            ):
+                with self.assertRaises(ProviderError) as ctx:
+                    provider._request_json("https://api.github.com/repos/jfut/prec/releases/latest")
+            self.assertEqual(
+                str(ctx.exception),
+                "prec: GitHub API returned HTTP 403: API rate limit exceeded.",
+            )
+
     def test_replace_cache_keeps_existing_cache_on_download_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             cache_path = os.path.join(tmp, "prec")

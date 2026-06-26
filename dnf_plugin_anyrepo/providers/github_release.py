@@ -251,10 +251,42 @@ class GitHubReleaseProvider:
     def _format_http_error_message(self, exc: urllib.error.HTTPError) -> str:
         # Include GitHub's response body so API failures such as rate limits are actionable.
         detail = self._read_http_error_detail(exc)
+        if exc.code == 403 and "API rate limit" in detail:
+            rate_limit_reset = self._read_rate_limit_reset_time()
+            if rate_limit_reset:
+                detail = f"{detail} {rate_limit_reset}"
         message = f"{self.config.name}: GitHub API returned HTTP {exc.code}"
         if detail:
             return f"{message}: {detail}"
         return message
+
+    def _read_rate_limit_reset_time(self) -> str:
+        request = urllib.request.Request(
+            "https://api.github.com/rate_limit",
+            headers=self._headers(),
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, UnicodeDecodeError):
+            return ""
+
+        if not isinstance(payload, dict):
+            return ""
+        rate = payload.get("rate")
+        if not isinstance(rate, dict):
+            return ""
+        reset = rate.get("reset")
+        if not isinstance(reset, int):
+            return ""
+
+        # Convert the Unix timestamp into the system local timezone for the error message.
+        reset_at = (
+            datetime.fromtimestamp(reset, tz=timezone.utc)
+            .astimezone()
+            .strftime("%Y-%m-%d %H:%M:%S %Z")
+        )
+        return f"The rate limit will reset at {reset_at}."
 
     def _read_http_error_detail(self, exc: urllib.error.HTTPError) -> str:
         if exc.fp is None:
