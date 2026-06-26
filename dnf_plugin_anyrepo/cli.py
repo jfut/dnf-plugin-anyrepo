@@ -237,17 +237,17 @@ def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
 
     # Normalize common config errors so the changed item stays easy to scan.
     if message.startswith("repository already exists: "):
-        name = message.removeprefix("repository already exists: ")
+        name = _remove_prefix(message, "repository already exists: ")
         return _format_mutation_result(repo_config_path(args.config, name), f"[{name}] repo already exists")
     if message.startswith("repository not found: "):
-        name = message.removeprefix("repository not found: ")
+        name = _remove_prefix(message, "repository not found: ")
         return _format_mutation_result(args.config, f"[{name}] repo not found")
     if message.startswith("unknown main key: "):
-        key = message.removeprefix("unknown main key: ")
+        key = _remove_prefix(message, "unknown main key: ")
         return _format_mutation_result(args.config, f"[main] unknown key {key}")
     if "] unknown repository key: " in message:
         section, _, key = message.partition("] unknown repository key: ")
-        name = section.removeprefix("[")
+        name = _remove_prefix(section, "[")
         return _format_mutation_result(args.config, f"[{name}] unknown repo key {key}")
     if ": " in message:
         name, detail = message.split(": ", 1)
@@ -255,6 +255,13 @@ def _format_cli_error(args: argparse.Namespace, exc: Exception) -> str:
             return f"ERROR: [{name}]: {detail}"
 
     return f"dnf-anyrepo: {message}"
+
+
+def _remove_prefix(value: str, prefix: str) -> str:
+    # Keep Python 3.6 compatibility while mirroring str.removeprefix behavior.
+    if value.startswith(prefix):
+        return value[len(prefix) :]
+    return value
 
 
 def _require_repo(config, name: str):
