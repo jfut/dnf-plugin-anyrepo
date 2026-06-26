@@ -58,7 +58,7 @@ class GitHubReleaseProvider:
 
         assets = self._matching_assets(release)
         if not assets:
-            raise ProviderError(f"{self.config.name}: no assets match {self.config.asset_regex}")
+            raise ProviderError(f"{self.config.name}: no assets match {self.config.asset_include}")
 
         self.release = release
         self.assets = assets
@@ -131,12 +131,15 @@ class GitHubReleaseProvider:
         return None
 
     def _matching_assets(self, release: Mapping[str, object]) -> List[Dict[str, object]]:
-        pattern = re.compile(self.config.asset_regex)
+        pattern = re.compile(self.config.asset_include)
+        exclude_pattern = re.compile(self.config.asset_exclude)
         assets = []
         for asset in release.get("assets", []):
             if not isinstance(asset, dict):
                 continue
             name = str(asset.get("name", ""))
+            if exclude_pattern.search(name):
+                continue
             if pattern.search(name) and self._matches_arch(name):
                 assets.append(asset)
         return self._filter_releasever_assets(assets)

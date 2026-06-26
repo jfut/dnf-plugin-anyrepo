@@ -4,10 +4,13 @@
 """Command line management tool for AnyRepo-managed DNF repositories."""
 
 import argparse
+import configparser
+import os
 import sys
 
 from dnf_plugin_anyrepo import repo as local_repo
 from dnf_plugin_anyrepo.config import (
+    DEFAULT_CACHE_DIR,
     DEFAULT_CONFIG_PATH,
     ConfigError,
     add_repo,
@@ -26,9 +29,14 @@ from dnf_plugin_anyrepo.dnf_plugin import repo_switch_gpgcheck
 from dnf_plugin_anyrepo.manager import RepositoryManager
 
 
-GLOBAL_REFRESH_KEYS = {"minimum_release_age"}
+GLOBAL_REFRESH_KEYS = {
+    "asset_exclude",
+    "asset_include",
+    "minimum_release_age",
+}
 REPO_REFRESH_KEYS = {
-    "asset_regex",
+    "asset_exclude",
+    "asset_include",
     "arch",
     "github_token_file",
     "minimum_release_age",
@@ -47,7 +55,8 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("url")
     add.add_argument("-n", "--name")
     add.add_argument("--source", default="github-release")
-    add.add_argument("--asset-regex")
+    add.add_argument("--asset-include")
+    add.add_argument("--asset-exclude")
     add.add_argument("--arch")
     add.add_argument("--releasever")
     add.add_argument("--minimum-release-age")
@@ -103,7 +112,8 @@ def main(argv=None):
 def _run(args: argparse.Namespace) -> int:
     if args.command == "add":
         values = {
-            "asset_regex": args.asset_regex,
+            "asset_include": args.asset_include,
+            "asset_exclude": args.asset_exclude,
             "arch": args.arch,
             "releasever": args.releasever,
             "minimum_release_age": args.minimum_release_age,
@@ -119,13 +129,12 @@ def _run(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "remove":
-        config = load_config(args.config)
-        repo = config.repos.get(args.name)
+        cache_path = _repo_cache_path_for_remove(args.config, args.name) if args.purge_cache else None
         removed, target_path = remove_section(args.config, args.name)
-        if args.purge_cache and repo:
-            local_repo.remove_cache(repo.cache_path)
         if not removed:
             raise ConfigError(f"repository not found: {args.name}")
+        if cache_path:
+            local_repo.remove_cache(cache_path)
         _print_mutation_result(target_path, f"[{args.name}] repo removed")
         return 0
 
@@ -166,6 +175,17 @@ def _run_repo_show(args: argparse.Namespace) -> int:
     repo = _require_repo(config, args.name)
     _print_repo_show(config, repo)
     return 0
+
+
+def _repo_cache_path_for_remove(path: str, repo_name: str) -> str:
+    # Allow stale sections to be removed without validating unrelated legacy keys.
+    parser = configparser.ConfigParser()
+    parser.read(path)
+    if not parser.has_section(repo_name):
+        return ""
+    main_cache_dir = parser.get("main", "cache_dir", fallback=DEFAULT_CACHE_DIR)
+    repo_cache_dir = parser.get(repo_name, "cache_dir", fallback=main_cache_dir)
+    return os.path.join(repo_cache_dir, repo_name)
 
 
 def _run_repo_set(args: argparse.Namespace) -> int:
@@ -264,6 +284,8 @@ def _print_list(config) -> None:
 
 def _print_global_show(main) -> None:
     values = {
+        "asset_exclude": main.asset_exclude,
+        "asset_include": main.asset_include,
         "cache_dir": main.cache_dir,
         "debug": "true" if main.debug else "false",
         "refresh_interval": format_duration(main.refresh_interval),
@@ -275,10 +297,11 @@ def _print_global_show(main) -> None:
 
 def _print_repo_show(config, repo) -> None:
     values = {
-        "asset_regex": _format_repo_config_value(config, repo, "asset_regex"),
+        "asset_include": _format_repo_config_value(config, repo, "asset_include"),
         "arch": _format_repo_config_value(config, repo, "arch"),
         "cache_dir": _format_repo_config_value(config, repo, "cache_dir"),
         "enabled": _format_repo_config_value(config, repo, "enabled"),
+        "asset_exclude": _format_repo_config_value(config, repo, "asset_exclude"),
         "github_token_file": _format_repo_config_value(config, repo, "github_token_file"),
         "gpgcheck": _format_repo_config_value(config, repo, "gpgcheck"),
         "minimum_release_age": _format_repo_config_value(config, repo, "minimum_release_age"),
@@ -323,7 +346,13 @@ def _format_repo_config_value(config, repo, key: str) -> str:
     value = getattr(repo, key)
     if key == "gpgcheck" and key not in _section_options(config.path, repo.name):
         return _format_inherited_gpgcheck()
-    inherited_global_keys = {"cache_dir", "refresh_interval", "minimum_release_age"}
+    inherited_global_keys = {
+        "asset_exclude",
+        "asset_include",
+        "cache_dir",
+        "refresh_interval",
+        "minimum_release_age",
+    }
     if key in inherited_global_keys and key not in _section_options(config.path, repo.name):
         return f"global({_format_display_value(key, value)})"
     return _format_display_value(key, value)
@@ -355,6 +384,15 @@ def _describe_current_value(path: str, section: str, key: str) -> str:
     inherited = key not in explicit_options
     if key == "gpgcheck" and inherited:
         return _format_inherited_gpgcheck()
+    inherited_global_keys = {
+        "asset_exclude",
+        "asset_include",
+        "cache_dir",
+        "refresh_interval",
+        "minimum_release_age",
+    }
+    if inherited and key in inherited_global_keys:
+        return f"global({_format_display_value(key, getattr(repo, key))})"
     return _format_display_value(key, getattr(repo, key), inherited=inherited)
 
 

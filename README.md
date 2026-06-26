@@ -91,7 +91,8 @@ Show details for one AnyRepo repository:
 ```bash
 # dnf-anyrepo repo prec
 arch: x86_64
-asset_regex: .*\.rpm$
+asset_exclude: (?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
+asset_include: .*\.rpm$
 cache_dir: global(/var/cache/dnf/anyrepo)
 enabled: true
 github_token_file:
@@ -112,7 +113,6 @@ New releases younger than `minimum_release_age` (`MIN_AGE`) are not shown.
 # dnf list | grep github.com
 firehol.noarch                                         3.1.7-1.el9                        github.com:firehol:packages
 iprange.x86_64                                         1.0.4-2.el9                        github.com:firehol:packages
-iprange-debugsource.x86_64                             1.0.4-2.el9                        github.com:firehol:packages
 ipset-fast-update.noarch                               1.6.0-1                            github.com:jfut:ipset-fast-update
 prec.x86_64                                            0.1.1-1                            github.com:jfut:prec
 ```
@@ -280,6 +280,8 @@ cache_dir = /var/cache/dnf/anyrepo
 refresh_interval = 600
 minimum_release_age = 3d
 debug = 0
+asset_include = .*\.rpm$
+asset_exclude = (?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
 ```
 
 Example per-repository file:
@@ -288,8 +290,11 @@ Example per-repository file:
 [dnf-plugin-anyrepo]
 source = github-release
 url = https://github.com/jfut/dnf-plugin-anyrepo
-asset_regex = .*\.rpm$
 minimum_release_age = 1800
+
+[prec]
+source = github-release
+url = https://github.com/jfut/prec
 ```
 
 When `include` is set, AnyRepo reads every `*.conf` file under that directory.
@@ -315,29 +320,30 @@ minimum_release_age=259200
 debug=0
 source=github-release
 enabled=true
-asset_regex=.*\.rpm$
+asset_include=.*\.rpm$
+asset_exclude=(?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
 ```
 
 ## Repository settings
 
 Per-repository sections support these keys:
 
-- `source`
-- `url`
-- `asset_regex`
+- `arch`
+- `asset_exclude`
+- `asset_include`
+- `cache_dir`
 - `enabled`
+- `github_token_file`
 - `gpgcheck`
 - `minimum_release_age`
-- `cache_dir`
 - `refresh_interval`
-- `arch`
 - `releasever`
-- `github_token_file`
+- `source`
+- `url`
 
 Notes:
 
-- `url` must be a GitHub repository URL
-- `source` must currently be `github-release`
+- `asset_exclude` is a regular expression applied after `asset_include`, and matching assets are skipped
 - `enabled = false` disables only that repository
 - `github_token_file` is read and used as a GitHub API bearer token
 
@@ -345,9 +351,16 @@ Notes:
 
 Asset selection happens in this order:
 
-1. Match `asset_regex`
-2. Match RPM architecture
-3. Match RHEL release marker when applicable
+1. Match `asset_include`
+2. Drop assets that match `asset_exclude`
+3. Match RPM architecture
+4. Match RHEL release marker when applicable
+
+Default excludes:
+
+- `debuginfo` RPMs
+- `debugsource` RPMs
+- `src.rpm`
 
 Architecture behavior:
 
@@ -457,7 +470,8 @@ dnf-anyrepo add https://github.com/jfut/prec
 dnf-anyrepo add https://github.com/firehol/packages -n firehol
 
 # with options
-dnf-anyrepo add https://github.com/jfut/prec --asset-regex '.*\.rpm$'
+dnf-anyrepo add https://github.com/jfut/prec --asset-include '.*\.rpm$'
+dnf-anyrepo add https://github.com/jfut/prec --asset-exclude '$^'
 dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 30m
 dnf-anyrepo add https://github.com/jfut/prec --arch x86_64 --releasever el10
 dnf-anyrepo add https://github.com/jfut/prec --github-token-file /etc/anyrepo/github.token
@@ -487,6 +501,7 @@ dnf-anyrepo repo prec
 dnf-anyrepo repo prec set minimum_release_age 1d
 dnf-anyrepo repo prec set enabled false
 dnf-anyrepo repo prec set gpgcheck 1
+dnf-anyrepo repo prec set asset_exclude '$^'
 dnf-anyrepo repo prec unset minimum_release_age
 ```
 

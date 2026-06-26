@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the dnf-plugin-anyrepo project.
 
+import contextlib
+import io
 import os
 import tempfile
 import unittest
@@ -8,6 +10,8 @@ from unittest import mock
 
 from dnf_plugin_anyrepo.config import (
     ConfigError,
+    DEFAULT_ASSET_INCLUDE,
+    DEFAULT_ASSET_EXCLUDE,
     add_repo,
     default_include_path,
     load_config,
@@ -44,9 +48,41 @@ class ConfigTest(unittest.TestCase):
             config = load_config(path)
             self.assertEqual(config.repos["prec"].minimum_release_age, 3600)
             self.assertEqual(config.repos["prec"].source, "github-release")
+            self.assertEqual(config.repos["prec"].asset_include, DEFAULT_ASSET_INCLUDE)
+            self.assertEqual(config.repos["prec"].asset_exclude, DEFAULT_ASSET_EXCLUDE)
             self.assertTrue(config.repos["prec"].enabled)
             self.assertIsNone(config.repos["prec"].gpgcheck)
             self.assertFalse(config.main.debug)
+
+    def test_load_main_reads_asset_filters(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    "asset_include = .*module.*\\.rpm$\n"
+                    "asset_exclude = -tests-.*\\.rpm$\n"
+                    "\n"
+                    "[prec]\n"
+                    "url = https://github.com/jfut/prec\n"
+                )
+            config = load_config(path)
+            self.assertEqual(config.main.asset_include, ".*module.*\\.rpm$")
+            self.assertEqual(config.main.asset_exclude, "-tests-.*\\.rpm$")
+            self.assertEqual(config.repos["prec"].asset_include, ".*module.*\\.rpm$")
+            self.assertEqual(config.repos["prec"].asset_exclude, "-tests-.*\\.rpm$")
+
+    def test_load_repo_reads_asset_exclude(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[prec]\n"
+                    "url = https://github.com/jfut/prec\n"
+                    "asset_exclude = -tests-.*\\.rpm$\n"
+                )
+            config = load_config(path)
+            self.assertEqual(config.repos["prec"].asset_exclude, "-tests-.*\\.rpm$")
 
     def test_load_repo_reads_gpgcheck(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -140,7 +176,7 @@ class ConfigTest(unittest.TestCase):
                 add_repo(path, "prec", "https://github.com/jfut/prec", source="bad")
             self.assertFalse(os.path.exists(path))
 
-    def test_rejects_invalid_asset_regex_before_write(self):
+    def test_rejects_invalid_asset_include_before_write(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with self.assertRaises(ConfigError):
@@ -148,7 +184,7 @@ class ConfigTest(unittest.TestCase):
                     path,
                     "prec",
                     "https://github.com/jfut/prec",
-                    values={"asset_regex": "["},
+                    values={"asset_include": "["},
                 )
             self.assertFalse(os.path.exists(path))
 
@@ -157,7 +193,9 @@ class ConfigTest(unittest.TestCase):
             path = os.path.join(tmp, "anyrepo.conf")
             add_repo(path, "prec", "https://github.com/jfut/prec")
             with self.assertRaises(ConfigError):
-                set_value(path, "prec", "asset_regex", "[")
+                set_value(path, "prec", "asset_include", "[")
+            with self.assertRaises(ConfigError):
+                set_value(path, "prec", "asset_exclude", "[")
             with self.assertRaises(ConfigError):
                 set_value(path, "prec", "source", "bad")
             with self.assertRaises(ConfigError):
@@ -176,6 +214,10 @@ class ConfigTest(unittest.TestCase):
             path = os.path.join(tmp, "anyrepo.conf")
             with self.assertRaises(ConfigError):
                 set_value(path, "main", "debug", "maybe")
+            with self.assertRaises(ConfigError):
+                set_value(path, "main", "asset_include", "[")
+            with self.assertRaises(ConfigError):
+                set_value(path, "main", "asset_exclude", "[")
             with self.assertRaises(ConfigError):
                 set_value(path, "main", "minimum_release_age", "later")
             with self.assertRaises(ConfigError):
@@ -202,23 +244,50 @@ class ConfigTest(unittest.TestCase):
                 add_repo(path, "bad[name]", "https://github.com/jfut/prec")
             self.assertFalse(os.path.exists(path))
 
-    def test_load_rejects_unknown_main_key(self):
+    def test_load_warns_and_ignores_unknown_main_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
                 # Catch typos that would otherwise make the intended setting inert.
                 fh.write("[main]\nminimum_release_gae = 1h\n")
-            with self.assertRaises(ConfigError):
-                load_config(path)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                config = load_config(path)
+            self.assertEqual(config.main.minimum_release_age, 3 * 86400)
+            self.assertEqual(
+                stderr.getvalue().strip(),
+                "warning: ignoring unknown main key: minimum_release_gae",
+            )
 
-    def test_load_rejects_unknown_repo_key(self):
+    def test_load_warns_and_ignores_unknown_repo_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
             with open(path, "w", encoding="utf-8") as fh:
                 # Catch typos that would otherwise leave the repository enabled.
                 fh.write("[prec]\nurl = https://github.com/jfut/prec\nenabledd = false\n")
-            with self.assertRaises(ConfigError):
-                load_config(path)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                config = load_config(path)
+            self.assertIn("prec", config.repos)
+            self.assertTrue(config.repos["prec"].enabled)
+            self.assertEqual(
+                stderr.getvalue().strip(),
+                "warning: ignoring unknown repository key [prec] enabledd",
+            )
+
+    def test_load_warns_and_ignores_legacy_repo_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[prec]\nurl = https://github.com/jfut/prec\nasset_regex = .*\\.rpm$\n")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                config = load_config(path)
+            self.assertEqual(config.repos["prec"].asset_include, DEFAULT_ASSET_INCLUDE)
+            self.assertEqual(
+                stderr.getvalue().strip(),
+                "warning: ignoring legacy config key [prec] asset_regex; use asset_include instead",
+            )
 
 
 if __name__ == "__main__":

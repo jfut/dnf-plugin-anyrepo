@@ -9,6 +9,7 @@ import os
 import platform
 import re
 import subprocess
+import sys
 from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -21,18 +22,25 @@ DEFAULT_MINIMUM_RELEASE_AGE = 3 * 86400
 DEFAULT_DEBUG = False
 DEFAULT_SOURCE = "github-release"
 DEFAULT_ENABLED = True
-DEFAULT_ASSET_REGEX = r".*\.rpm$"
+DEFAULT_ASSET_INCLUDE = r".*\.rpm$"
+DEFAULT_ASSET_EXCLUDE = r"(?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)"
+LEGACY_REPO_KEYS = {
+    "asset_regex": "asset_include",
+}
 MAIN_CONFIG_KEYS = {
     "cache_dir",
     "refresh_interval",
     "minimum_release_age",
     "debug",
     INCLUDE_KEY,
+    "asset_include",
+    "asset_exclude",
 }
 REPO_CONFIG_KEYS = {
     "source",
     "url",
-    "asset_regex",
+    "asset_include",
+    "asset_exclude",
     "enabled",
     "minimum_release_age",
     "cache_dir",
@@ -58,12 +66,16 @@ class MainConfig:
         minimum_release_age=DEFAULT_MINIMUM_RELEASE_AGE,
         debug=DEFAULT_DEBUG,
         include=None,
+        asset_include=DEFAULT_ASSET_INCLUDE,
+        asset_exclude=DEFAULT_ASSET_EXCLUDE,
     ):
         self.cache_dir = cache_dir
         self.refresh_interval = refresh_interval
         self.minimum_release_age = minimum_release_age
         self.debug = debug
         self.include = include
+        self.asset_include = asset_include
+        self.asset_exclude = asset_exclude
 
 
 class RepoConfig:
@@ -72,11 +84,12 @@ class RepoConfig:
         name,
         source,
         url,
-        asset_regex,
+        asset_include,
         enabled,
         minimum_release_age,
         cache_dir,
         refresh_interval,
+        asset_exclude=DEFAULT_ASSET_EXCLUDE,
         arch=None,
         releasever=None,
         github_token_file=None,
@@ -85,7 +98,8 @@ class RepoConfig:
         self.name = name
         self.source = source
         self.url = url
-        self.asset_regex = asset_regex
+        self.asset_include = asset_include
+        self.asset_exclude = asset_exclude
         self.enabled = enabled
         self.minimum_release_age = minimum_release_age
         self.cache_dir = cache_dir
@@ -123,6 +137,10 @@ def validate_main_value(key: str, value: object) -> None:
         parse_duration(value)
     elif key == "debug":
         parse_bool(value)
+    elif key == "asset_include":
+        validate_asset_pattern(str(value), key=key)
+    elif key == "asset_exclude":
+        validate_asset_pattern(str(value), key=key)
 
 
 def validate_repo_value(section: str, key: str, value: object) -> None:
@@ -134,8 +152,10 @@ def validate_repo_value(section: str, key: str, value: object) -> None:
         validate_source(str(value), section)
     elif key == "url":
         parse_github_url(str(value))
-    elif key == "asset_regex":
-        validate_asset_regex(str(value), section)
+    elif key == "asset_include":
+        validate_asset_pattern(str(value), section, key)
+    elif key == "asset_exclude":
+        validate_asset_pattern(str(value), section, key)
     elif key == "enabled":
         parse_bool(value)
     elif key == "gpgcheck":
@@ -166,16 +186,28 @@ def validate_repo_name(name: str) -> str:
     return normalized
 
 
-def reject_unknown_options(section: str, keys: Iterable[str]) -> None:
-    """Catch configuration typos before they silently change behavior."""
+def warn_unknown_options(section: str, keys: Iterable[str], warn=None) -> None:
+    """Ignore unknown config keys while surfacing them as warnings."""
 
+    warn = warn or _default_config_warn
     allowed = MAIN_CONFIG_KEYS if section == "main" else REPO_CONFIG_KEYS
     for key in keys:
         if key in allowed:
             continue
+        if section != "main" and key in LEGACY_REPO_KEYS:
+            warn(
+                f"ignoring legacy config key [{section}] {key}; "
+                f"use {LEGACY_REPO_KEYS[key]} instead"
+            )
+            continue
         if section == "main":
-            raise ConfigError(f"unknown main key: {key}")
-        raise ConfigError(f"[{section}] unknown repository key: {key}")
+            warn(f"ignoring unknown main key: {key}")
+            continue
+        warn(f"ignoring unknown repository key [{section}] {key}")
+
+
+def _default_config_warn(message: str) -> None:
+    print(f"warning: {message}", file=sys.stderr)
 
 
 def default_include_path(path: str) -> str:
@@ -361,12 +393,14 @@ def validate_source(source: str, section: Optional[str] = None) -> str:
     return source
 
 
-def validate_asset_regex(pattern: str, section: Optional[str] = None) -> str:
+def validate_asset_pattern(
+    pattern: str, section: Optional[str] = None, key: str = "asset pattern"
+) -> str:
     try:
         re.compile(pattern)
     except re.error as exc:
         prefix = f"[{section}] " if section else ""
-        raise ConfigError(f"{prefix}invalid asset_regex: {exc}") from exc
+        raise ConfigError(f"{prefix}invalid {key}: {exc}") from exc
     return pattern
 
 
@@ -374,11 +408,11 @@ def repo_name_from_url(url: str) -> str:
     return parse_github_url(url)[1]
 
 
-def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
+def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
     parser = read_parser(path)
 
     main_section = parser["main"] if parser.has_section("main") else {}
-    reject_unknown_options("main", main_section.keys())
+    warn_unknown_options("main", main_section.keys(), warn=warn)
     main = MainConfig(
         cache_dir=str(main_section.get("cache_dir", DEFAULT_CACHE_DIR)),
         refresh_interval=parse_duration(main_section.get("refresh_interval", DEFAULT_REFRESH_INTERVAL)),
@@ -387,6 +421,14 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
         ),
         debug=parse_bool(main_section.get("debug", DEFAULT_DEBUG)),
         include=main_section.get(INCLUDE_KEY),
+        asset_include=validate_asset_pattern(
+            main_section.get("asset_include", DEFAULT_ASSET_INCLUDE),
+            key="asset_include",
+        ),
+        asset_exclude=validate_asset_pattern(
+            main_section.get("asset_exclude", DEFAULT_ASSET_EXCLUDE),
+            key="asset_exclude",
+        ),
     )
 
     repos: Dict[str, RepoConfig] = {}
@@ -400,14 +442,19 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
         if section == "main":
             continue
         item = parser[section]
-        reject_unknown_options(section, item.keys())
+        warn_unknown_options(section, item.keys(), warn=warn)
         source = item.get("source", DEFAULT_SOURCE)
         validate_source(source, section)
         if "url" not in item:
             raise ConfigError(f"[{section}] url is required")
         url = item["url"]
         parse_github_url(url)
-        asset_regex = validate_asset_regex(item.get("asset_regex", DEFAULT_ASSET_REGEX), section)
+        asset_include = validate_asset_pattern(
+            item.get("asset_include", main.asset_include), section, "asset_include"
+        )
+        asset_exclude = validate_asset_pattern(
+            item.get("asset_exclude", main.asset_exclude), section, "asset_exclude"
+        )
         minimum_release_age = parse_duration(
             item.get("minimum_release_age", main.minimum_release_age)
         )
@@ -418,7 +465,8 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> PluginConfig:
             name=section,
             source=source,
             url=url,
-            asset_regex=asset_regex,
+            asset_include=asset_include,
+            asset_exclude=asset_exclude,
             enabled=parse_bool(item.get("enabled", DEFAULT_ENABLED)),
             minimum_release_age=minimum_release_age,
             cache_dir=cache_dir,

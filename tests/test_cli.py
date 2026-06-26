@@ -63,6 +63,42 @@ class CliTest(unittest.TestCase):
             self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo removed ({repo_path})")
             self.assertFalse(os.path.exists(repo_path))
 
+    def test_remove_ignores_unknown_legacy_repo_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    f"[{SSL_CERT_REPO}]\n"
+                    "url = https://github.com/jfut/sslcert-cli\n"
+                    "asset_regex = .*\\.rpm$\n"
+                )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "remove", SSL_CERT_REPO])
+            self.assertEqual(result, 0)
+            self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo removed ({path})")
+
+    def test_remove_purge_cache_ignores_unknown_legacy_repo_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_root = os.path.join(tmp, "cache")
+            cache_path = os.path.join(cache_root, SSL_CERT_REPO)
+            os.makedirs(cache_path)
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    f"cache_dir = {cache_root}\n"
+                    "\n"
+                    f"[{SSL_CERT_REPO}]\n"
+                    "url = https://github.com/jfut/sslcert-cli\n"
+                    "asset_regex = .*\\.rpm$\n"
+                )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "remove", SSL_CERT_REPO, "--purge-cache"])
+            self.assertEqual(result, 0)
+            self.assertFalse(os.path.exists(cache_path))
+
     def test_unset_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
@@ -167,6 +203,8 @@ class CliTest(unittest.TestCase):
                 stdout.getvalue().strip(),
                 "\n".join(
                     [
+                        "asset_exclude: (?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)",
+                        "asset_include: .*\\.rpm$",
                         "cache_dir: /tmp/anyrepo-cache",
                         "debug: true",
                         "minimum_release_age: 2d",
@@ -330,7 +368,8 @@ class CliTest(unittest.TestCase):
                 "\n".join(
                     [
                         "arch: x86_64",
-                        "asset_regex: .*\\.rpm$",
+                        "asset_exclude: global((?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$))",
+                        "asset_include: global(.*\\.rpm$)",
                         "cache_dir: global(/tmp/anyrepo-cache)",
                         "enabled: true",
                         "github_token_file:",
@@ -478,6 +517,70 @@ class CliTest(unittest.TestCase):
                 stderr.getvalue().strip(),
                 f"[nmcli-cli] unknown repo key unknown_key ({path})",
             )
+
+    def test_repo_show_prints_repository_asset_exclude_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[prec]\n"
+                    "url = https://github.com/jfut/prec\n"
+                    "asset_exclude = -tests-.*\\.rpm$\n"
+                )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "prec"])
+            self.assertEqual(result, 0)
+            self.assertIn("asset_exclude: -tests-.*\\.rpm$\n", stdout.getvalue())
+
+    def test_set_asset_include_prints_inherited_before_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[prec]\nurl = https://github.com/jfut/prec\n")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "prec", "set", "asset_include", ".*module.*\\.rpm$"])
+            self.assertEqual(result, 0)
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                "\n".join(
+                    [
+                        f"[prec] asset_include: global(.*\\.rpm$) -> .*module.*\\.rpm$ ({path})",
+                        "",
+                        "NOTICE: Run refresh immediately to apply the configuration changes.",
+                        "-> dnf-anyrepo refresh prec -f",
+                    ]
+                ),
+            )
+
+    def test_set_asset_include_prints_refresh_hint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("[prec]\nurl = https://github.com/jfut/prec\n")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "prec", "set", "asset_include", ".*module.*\\.rpm$"])
+            self.assertEqual(result, 0)
+            self.assertIn("-> dnf-anyrepo refresh prec -f\n", stdout.getvalue())
+
+    def test_global_set_asset_exclude_prints_refresh_hint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    "asset_exclude = -tests-.*\\.rpm$\n"
+                    "\n"
+                    "[nmcli-cli]\n"
+                    "url = https://github.com/jfut/nmcli-cli\n"
+                )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "set", "asset_exclude", "$^"])
+            self.assertEqual(result, 0)
+            self.assertIn("-> dnf-anyrepo refresh -f\n", stdout.getvalue())
 
 
 if __name__ == "__main__":

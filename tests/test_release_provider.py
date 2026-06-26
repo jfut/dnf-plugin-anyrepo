@@ -19,7 +19,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             name=name,
             source="github-release",
             url="https://github.com/jfut/prec",
-            asset_regex=r".*\.rpm$",
+            asset_include=r".*\.rpm$",
             enabled=True,
             minimum_release_age=0,
             cache_dir=tmp,
@@ -47,17 +47,56 @@ class GitHubReleaseProviderTest(unittest.TestCase):
     def test_matching_assets(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp)
-            config.asset_regex = r"\.rpm$"
+            config.asset_include = r"\.rpm$"
             provider = GitHubReleaseProvider(config)
             assets = provider._matching_assets(
                 {"assets": [{"name": "prec.rpm"}, {"name": "checksums.txt"}]}
             )
             self.assertEqual([asset["name"] for asset in assets], ["prec.rpm"])
 
+    def test_matching_assets_excludes_debug_and_source_rpms_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp)
+            config.asset_include = r"\.rpm$"
+            provider = GitHubReleaseProvider(config)
+            assets = provider._matching_assets(
+                {
+                    "assets": [
+                        {"name": "tool-1.0-1.x86_64.rpm"},
+                        {"name": "tool-debuginfo-1.0-1.x86_64.rpm"},
+                        {"name": "tool-debugsource-1.0-1.x86_64.rpm"},
+                        {"name": "tool-1.0-1.src.rpm"},
+                    ]
+                }
+            )
+            self.assertEqual([asset["name"] for asset in assets], ["tool-1.0-1.x86_64.rpm"])
+
+    def test_matching_assets_allows_override_of_default_asset_exclude(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp)
+            config.asset_include = r"\.rpm$"
+            config.asset_exclude = r"$^"
+            provider = GitHubReleaseProvider(config)
+            assets = provider._matching_assets(
+                {
+                    "assets": [
+                        {"name": "tool-1.0-1.x86_64.rpm"},
+                        {"name": "tool-debuginfo-1.0-1.x86_64.rpm"},
+                    ]
+                }
+            )
+            self.assertEqual(
+                [asset["name"] for asset in assets],
+                [
+                    "tool-1.0-1.x86_64.rpm",
+                    "tool-debuginfo-1.0-1.x86_64.rpm",
+                ],
+            )
+
     def test_matching_assets_honors_arch_and_releasever(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp, name="tool")
-            config.asset_regex = r"\.rpm$"
+            config.asset_include = r"\.rpm$"
             config.arch = "x86_64"
             config.releasever = "el9"
             provider = GitHubReleaseProvider(config)
@@ -85,7 +124,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
     def test_matching_assets_falls_back_to_nearest_lower_releasever(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp, name="tool")
-            config.asset_regex = r"\.rpm$"
+            config.asset_include = r"\.rpm$"
             config.arch = "x86_64"
             config.releasever = "el10"
             provider = GitHubReleaseProvider(config)
@@ -110,7 +149,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
     def test_matching_assets_uses_older_releasever_when_only_older_exists(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp, name="tool")
-            config.asset_regex = r"\.rpm$"
+            config.asset_include = r"\.rpm$"
             config.arch = "x86_64"
             config.releasever = "el9"
             provider = GitHubReleaseProvider(config)
@@ -130,7 +169,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
     def test_matching_assets_excludes_older_module_release_when_exact_exists(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp, name="nginx-module-fancyindex")
-            config.asset_regex = r"\.rpm$"
+            config.asset_include = r"\.rpm$"
             config.arch = "x86_64"
             config.releasever = "el10"
             provider = GitHubReleaseProvider(config)
@@ -148,7 +187,6 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 [asset["name"] for asset in assets],
                 [
                     "nginx-module-fancyindex-0.5.2-8.el10.x86_64.rpm",
-                    "nginx-module-fancyindex-debuginfo-0.5.2-8.el10.x86_64.rpm",
                 ],
             )
 
@@ -301,7 +339,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 fh.write(b"old")
 
             config = self.make_config(tmp)
-            config.asset_regex = r"\.rpm$"
+            config.asset_include = r"\.rpm$"
             provider = GitHubReleaseProvider(config)
             provider.release = {"id": 1, "tag_name": "v1"}
             provider.assets = [
