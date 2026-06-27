@@ -33,7 +33,7 @@ Install from [Releases](https://github.com/jfut/dnf-plugin-anyrepo/releases) by 
 
 ```bash
 # Import the RPM public signing key for dnf-plugin-anyrepo
-# rpm --import https://raw.githubusercontent.com/jfut/dnf-plugin-anyrepo/refs/heads/main/packaging/RPM-GPG-KEY-jfut-github
+rpm --import https://raw.githubusercontent.com/jfut/dnf-plugin-anyrepo/refs/heads/main/packaging/RPM-GPG-KEY-jfut-github
 
 # RHEL 8, AlmaLinux 8, Rocky Linux 8, and other compatible distributions
 dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/dnf-plugin-anyrepo-x.y.z-n.el8.noarch.rpm
@@ -50,7 +50,7 @@ dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/
 If the RPM public signing key is available, import it first:
 
 ```bash
-# rpm --import https://raw.githubusercontent.com/jfut/dnf-plugin-anyrepo/refs/heads/main/packaging/RPM-GPG-KEY-jfut-github
+rpm --import https://raw.githubusercontent.com/jfut/dnf-plugin-anyrepo/refs/heads/main/packaging/RPM-GPG-KEY-jfut-github
 ```
 
 Register GitHub repositories that publish RPM assets:
@@ -58,11 +58,11 @@ Register GitHub repositories that publish RPM assets:
 The following release RPMs are signed with the same RPM public key as `dnf-plugin-anyrepo`.
 
 ```bash
-# dnf-anyrepo add https://github.com/jfut/dnf-plugin-anyrepo
-# dnf-anyrepo add https://github.com/jfut/prec
-# dnf-anyrepo add https://github.com/jfut/sslcert-cli
-# dnf-anyrepo add https://github.com/jfut/nmcli-cli
-# dnf-anyrepo add https://github.com/jfut/ipset-fast-update
+dnf-anyrepo add https://github.com/jfut/dnf-plugin-anyrepo
+dnf-anyrepo add https://github.com/jfut/prec
+dnf-anyrepo add https://github.com/jfut/sslcert-cli
+dnf-anyrepo add https://github.com/jfut/nmcli-cli
+dnf-anyrepo add https://github.com/jfut/ipset-fast-update
 ```
 
 Use `-n` or `--name` to register a repository under an alias instead of the repository name.
@@ -70,8 +70,8 @@ Use `-n` or `--name` to register a repository under an alias instead of the repo
 The following release RPMs are unsigned, so gpgcheck must be disabled.
 
 ```bash
-# dnf-anyrepo add https://github.com/firehol/packages -n firehol
-# dnf-anyrepo repo firehol set gpgcheck 0
+dnf-anyrepo add https://github.com/firehol/packages -n firehol
+dnf-anyrepo repo firehol set gpgcheck 0
 ```
 
 List repositories managed by AnyRepo:
@@ -130,14 +130,14 @@ Repositories without their own `minimum_release_age` override inherit this value
 Change `minimum_release_age` for individual repositories:
 
 ```bash
-# dnf-anyrepo repo nmcli-cli set minimum_release_age 3h
-# dnf-anyrepo repo sslcert-cli set minimum_release_age 5h
+dnf-anyrepo repo nmcli-cli set minimum_release_age 3h
+dnf-anyrepo repo sslcert-cli set minimum_release_age 5h
 ```
 
 Refresh the local cache explicitly:
 
 ```bash
-# dnf-anyrepo refresh prec
+dnf-anyrepo refresh prec
 ```
 
 List repositories again after the `MIN_AGE` overrides are applied:
@@ -196,8 +196,8 @@ Complete!
 Update packages through ordinary `dnf upgrade`:
 
 ```bash
-# dnf upgrade prec
-# dnf upgrade
+dnf upgrade prec
+dnf upgrade
 ```
 
 Automatic updates through `dnf-automatic.timer` also pick up AnyRepo-managed packages transparently.
