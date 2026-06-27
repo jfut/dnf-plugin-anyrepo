@@ -295,6 +295,9 @@ if dnf is not None:
             return False
 
         def _warn_unsigned_packages(self, packages):
+            if all(self._repo_gpgcheck_disabled(pkg) for pkg in packages):
+                self._warn_unsigned_package_names(packages)
+                return
             names = sorted(
                 {
                     getattr(self, "_anyrepo_repo_names", {}).get(
@@ -310,6 +313,23 @@ if dnf is not None:
                 "configure the following:",
             ]
             lines.extend(f"- dnf-anyrepo repo {name} set gpgcheck 0" for name in names)
+            lines.append("")
+            self._print_unsigned_warning_block(lines)
+
+        def _repo_gpgcheck_disabled(self, pkg):
+            # Use the registered DNF repo settings to decide whether unsigned RPMs
+            # are already allowed for the package's source repository.
+            repoid = getattr(pkg, "repoid", "")
+            try:
+                repo = self.base.repos[repoid]
+            except KeyError:
+                return False
+            return not bool(getattr(repo, "gpgcheck", True))
+
+        def _warn_unsigned_package_names(self, packages):
+            package_names = sorted({pkg.name for pkg in packages})
+            lines = ["", "WARNING: The following packages are unsigned."]
+            lines.extend(f"- {name}" for name in package_names)
             lines.append("")
             self._print_unsigned_warning_block(lines)
 
