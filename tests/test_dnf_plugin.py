@@ -251,6 +251,61 @@ class DnfPluginTest(unittest.TestCase):
         )
 
     @unittest.skipIf(dnf is None, "dnf is not available")
+    def test_warn_unsigned_packages_lists_package_names_when_gpgcheck_disabled(self):
+        base = dnf.Base()
+        plugin = AnyRepoPlugin(base, None)
+        disabled_repo = mock.Mock()
+        disabled_repo.id = "github.com:jfut:iprange"
+        disabled_repo.gpgcheck = False
+        base.repos.add(disabled_repo)
+        pkg = mock.Mock()
+        pkg.name = "iprange"
+        pkg.repoid = "github.com:jfut:iprange"
+
+        with mock.patch("sys.stderr", new=StringIO()) as stderr:
+            plugin._warn_unsigned_packages([pkg])
+
+        self.assertEqual(
+            stderr.getvalue(),
+            "\nWARNING: The following packages are unsigned.\n"
+            "- iprange\n\n",
+        )
+
+    @unittest.skipIf(dnf is None, "dnf is not available")
+    def test_warn_unsigned_packages_keeps_existing_message_when_any_repo_requires_gpgcheck(self):
+        base = dnf.Base()
+        plugin = AnyRepoPlugin(base, None)
+        plugin._anyrepo_repo_names = {
+            "github.com:jfut:iprange": "iprange",
+            "github.com:jfut:prec": "prec",
+        }
+        disabled_repo = mock.Mock()
+        disabled_repo.id = "github.com:jfut:iprange"
+        disabled_repo.gpgcheck = False
+        enabled_repo = mock.Mock()
+        enabled_repo.id = "github.com:jfut:prec"
+        enabled_repo.gpgcheck = True
+        base.repos.add(disabled_repo)
+        base.repos.add(enabled_repo)
+        pkg = mock.Mock()
+        pkg.name = "iprange"
+        pkg.repoid = "github.com:jfut:iprange"
+        pkg2 = mock.Mock()
+        pkg2.name = "prec"
+        pkg2.repoid = "github.com:jfut:prec"
+
+        with mock.patch("sys.stderr", new=StringIO()) as stderr:
+            plugin._warn_unsigned_packages([pkg, pkg2])
+
+        self.assertEqual(
+            stderr.getvalue(),
+            "\nWARNING: To continue installing unsigned AnyRepo packages, "
+            "configure the following:\n"
+            "- dnf-anyrepo repo iprange set gpgcheck 0\n"
+            "- dnf-anyrepo repo prec set gpgcheck 0\n\n",
+        )
+
+    @unittest.skipIf(dnf is None, "dnf is not available")
     def test_package_is_signed_ignores_missing_openpgp_tag(self):
         base = dnf.Base()
         plugin = AnyRepoPlugin(base, None)
