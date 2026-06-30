@@ -8,6 +8,7 @@ import configparser
 import os
 import sys
 
+from dnf_plugin_anyrepo import __commit__, __version__
 from dnf_plugin_anyrepo import repo as local_repo
 from dnf_plugin_anyrepo.config import (
     DEFAULT_CACHE_DIR,
@@ -28,7 +29,6 @@ from dnf_plugin_anyrepo.config import (
 from dnf_plugin_anyrepo.dnf_plugin import repo_switch_gpgcheck
 from dnf_plugin_anyrepo.manager import RepositoryManager
 
-
 GLOBAL_REFRESH_KEYS = {
     "asset_exclude",
     "asset_include",
@@ -48,6 +48,8 @@ REPO_REFRESH_KEYS = {
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dnf-anyrepo")
+    # Print the installed package version before parsing subcommands.
+    parser.add_argument("-v", "--version", action="version", version=_cli_version())
     parser.add_argument("--config", default=DEFAULT_CONFIG_PATH)
     sub = parser.add_subparsers(dest="command")
 
@@ -168,6 +170,11 @@ def _run(args: argparse.Namespace) -> int:
         raise ConfigError(f"unknown repo command: {args.repo_command}")
 
     raise ConfigError(f"unknown command: {args.command}")
+
+
+def _cli_version() -> str:
+    version = "dev" if __version__ == "0.dev0" else __version__
+    return f"dnf-anyrepo {version} ({__commit__})"
 
 
 def _run_repo_show(args: argparse.Namespace) -> int:

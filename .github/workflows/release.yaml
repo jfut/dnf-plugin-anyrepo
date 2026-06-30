@@ -29,6 +29,9 @@ jobs:
           umask 077
           printf '%s\n' "$RPM_SIGNING_KEY" > "$RUNNER_TEMP/rpm-signing-key.asc"
 
+      - name: Write build metadata
+        run: python3 packaging/write_build_metadata.py release --version "${GITHUB_REF_NAME#v}" --commit "$GITHUB_SHA"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
         with:
