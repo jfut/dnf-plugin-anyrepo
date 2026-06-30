@@ -2,3 +2,19 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "dnf-plugin-anyrepo"
+dynamic = ["version"]
+description = "DNF plugin that turns remote RPM assets into local file repositories"
+readme = "README.md"
+requires-python = ">=3.6"
+license = { text = "Apache-2.0" }
+
+[project.scripts]
+dnf-anyrepo = "dnf_plugin_anyrepo.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "dnf_plugin_anyrepo.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["dnf_plugin_anyrepo*"]

@@ -15,7 +15,7 @@ default:
 
 # Remove generated files so local validation can start from a clean tree.
 clean:
-    rm -rf build dist *.egg-info
+    rm -rf build dist *.egg-info .pytest_cache
     find . -type d -name __pycache__ -prune -exec rm -rf {} +
 
 #
@@ -34,13 +34,13 @@ lint:
         list(Path("dnf_plugin_anyrepo").rglob("*.py"))
         + list(Path("plugins").rglob("*.py"))
         + list(Path("tests").rglob("*.py"))
-        + [Path("setup.py")]
+        + list(Path("packaging").rglob("*.py"))
     )
     for path in paths:
         ast.parse(path.read_text(), filename=str(path), feature_version=(3, 6))
     print("python 3.6 syntax ok")
     PY
-    {{PYTHON}} -m compileall -q dnf_plugin_anyrepo plugins tests setup.py
+    {{PYTHON}} -m compileall -q dnf_plugin_anyrepo plugins tests packaging
 
 # Run unit tests with unittest.
 test:
@@ -127,7 +127,7 @@ check: lint test exec-test
 
 # Build a local Python source distribution.
 build: clean
-    {{PYTHON}} setup.py sdist
+    {{PYTHON}} -c 'from setuptools.build_meta import build_sdist; print(build_sdist("dist"))'
 
 #
 # release
@@ -135,8 +135,10 @@ build: clean
 
 # Build a local snapshot release without publishing.
 snapshot: clean
+    {{PYTHON}} packaging/write_build_metadata.py snapshot
     goreleaser release --skip=publish --clean --snapshot
 
 # Build release artifacts without publishing.
 release: clean
+    {{PYTHON}} packaging/write_build_metadata.py release
     goreleaser release --skip=publish --clean --skip=validate

@@ -31,6 +31,47 @@ class CliTest(unittest.TestCase):
             self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo added ({repo_path})")
             self.assertTrue(os.path.isfile(repo_path))
 
+    def test_version_flag_prints_installed_rpm_version(self):
+        stdout = io.StringIO()
+        with mock.patch(
+            "dnf_plugin_anyrepo.cli.__version__",
+            "1.3.1",
+        ), mock.patch(
+            "dnf_plugin_anyrepo.cli.__commit__",
+            "71d03167cf0cae4d8408970851fa62be197d68ea",
+        ):
+            with self.assertRaises(SystemExit) as exc, contextlib.redirect_stdout(stdout):
+                main(["--version"])
+        self.assertEqual(exc.exception.code, 0)
+        self.assertEqual(
+            stdout.getvalue().strip(),
+            "dnf-anyrepo 1.3.1 (71d03167cf0cae4d8408970851fa62be197d68ea)",
+        )
+
+    def test_short_version_flag_prints_installed_rpm_version(self):
+        stdout = io.StringIO()
+        with mock.patch(
+            "dnf_plugin_anyrepo.cli.__version__",
+            "1.3.1",
+        ), mock.patch(
+            "dnf_plugin_anyrepo.cli.__commit__",
+            "71d03167cf0cae4d8408970851fa62be197d68ea",
+        ):
+            with self.assertRaises(SystemExit) as exc, contextlib.redirect_stdout(stdout):
+                main(["-v"])
+        self.assertEqual(exc.exception.code, 0)
+        self.assertEqual(
+            stdout.getvalue().strip(),
+            "dnf-anyrepo 1.3.1 (71d03167cf0cae4d8408970851fa62be197d68ea)",
+        )
+
+    def test_version_flag_uses_default_build_metadata(self):
+        stdout = io.StringIO()
+        with self.assertRaises(SystemExit) as exc, contextlib.redirect_stdout(stdout):
+            main(["--version"])
+        self.assertEqual(exc.exception.code, 0)
+        self.assertEqual(stdout.getvalue().strip(), "dnf-anyrepo dev (none)")
+
     def test_add_existing_repo_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
