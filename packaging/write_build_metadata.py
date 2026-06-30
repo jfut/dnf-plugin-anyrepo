@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -73,12 +74,16 @@ def _source_metadata(name: str) -> str:
     return match.group(1)
 
 
-def _git_output_or_none(*args: str) -> str | None:
+def _git_output_or_none(*args: str) -> Optional[str]:
     git_dir = ROOT / ".git"
     if not git_dir.exists():
         return None
     try:
-        return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
+        return subprocess.check_output(
+            ["git", *args],
+            cwd=ROOT,
+            universal_newlines=True,
+        ).strip()
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None
 
