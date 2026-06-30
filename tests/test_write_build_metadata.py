@@ -24,7 +24,10 @@ class WriteBuildMetadataTest(unittest.TestCase):
                 write_build_metadata,
                 "_git_output_or_none",
                 return_value=None,
-            ), mock.patch("sys.argv", ["write_build_metadata.py", "snapshot"]):
+            ), mock.patch.dict("os.environ", {}, clear=True), mock.patch(
+                "sys.argv",
+                ["write_build_metadata.py", "snapshot"],
+            ):
                 result = write_build_metadata.main()
 
             self.assertEqual(result, 0)
