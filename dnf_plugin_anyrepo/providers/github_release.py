@@ -353,7 +353,7 @@ class GitHubReleaseProvider:
         if exc.code == 403 and "API rate limit" in detail:
             rate_limit_reset = self._read_rate_limit_reset_time()
             if rate_limit_reset:
-                detail = f"{detail} {rate_limit_reset}"
+                detail = f"{detail}\n{rate_limit_reset}"
         message = f"{self.config.name}: GitHub API returned HTTP {exc.code}"
         if detail:
             return f"{message}: {detail}"
