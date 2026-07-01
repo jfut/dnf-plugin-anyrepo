@@ -1,6 +1,6 @@
 # dnf-plugin-anyrepo
 
-![Tag](https://img.shields.io/github/tag/jfut/dnf-plugin-anyrepo.svg)
+[![Tag](https://img.shields.io/github/tag/jfut/dnf-plugin-anyrepo.svg)](https://github.com/jfut/dnf-plugin-anyrepo/releases)
 [![License](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/jfut/dnf-plugin-anyrepo/blob/main/LICENSE)
 
 `dnf-plugin-anyrepo` is a DNF plugin that makes remote RPM assets available to ordinary DNF commands as transparent, dynamic local RPM repositories.
