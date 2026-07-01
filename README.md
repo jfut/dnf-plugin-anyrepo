@@ -106,7 +106,7 @@ url: https://github.com/jfut/prec
 
 AnyRepo repositories appear transparently in `dnf list`:
 
-New releases younger than `minimum_release_age` (`MIN_AGE`) are not shown.
+When the newest release is younger than `minimum_release_age` (`MIN_AGE`), AnyRepo keeps using the latest older release that satisfies the age limit.
 
 [`github.com:firehol:packages`](https://github.com/firehol/packages) falls back to `el9` automatically because no `el10` assets are published.
 
@@ -410,8 +410,9 @@ now - published_at >= minimum_release_age
 
 If the latest release is too new:
 
-- existing cached metadata is kept when a usable cache already exists
-- a new repository is not generated when no cache exists yet
+- the latest older release that already satisfies `minimum_release_age` is selected automatically
+- existing cached metadata is kept when no release satisfies the age limit yet
+- a new repository is not generated when no cache exists yet and no release is old enough
 
 This helps avoid immediately shipping a release while assets are still being uploaded or verified.
 

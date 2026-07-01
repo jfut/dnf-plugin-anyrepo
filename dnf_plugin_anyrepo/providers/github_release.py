@@ -34,6 +34,7 @@ class GitHubAPIError(ProviderError):
 
 
 TRANSIENT_HTTP_STATUS = {502, 503, 504}
+GITHUB_RELEASES_PER_PAGE = 100
 EL_MARKER_RE = re.compile(
     r"(?P<marker>\.(?:module_)?el(?P<major>\d+)(?:[._][A-Za-z0-9]+)*)(?=\.[^.]+\.rpm$)"
 )
@@ -51,11 +52,12 @@ class GitHubReleaseProvider:
     def refresh(self) -> bool:
         """Fetch metadata, apply age filtering, download RPMs, and update repodata."""
 
-        release = self._fetch_latest_release()
-        if not self._release_is_old_enough(release):
-            # Remove stale repodata so DNF stops exposing packages until the release ages in.
-            local_repo.remove_cache(self.config.cache_path)
-            self.state = {}
+        release = self._fetch_latest_eligible_release()
+        if release is None:
+            # Keep a usable older cache until a newer release satisfies minimum_release_age.
+            if local_repo.has_repodata(self.config.cache_path):
+                self.state["last_refresh_at"] = utcnow_iso()
+                save_state(self.config.cache_path, self.state)
             return False
 
         assets = self._matching_assets(release)
@@ -123,26 +125,25 @@ class GitHubReleaseProvider:
             shutil.rmtree(staging, ignore_errors=True)
             raise
 
-    def _fetch_latest_release(self) -> Dict[str, object]:
+    def _fetch_latest_eligible_release(self) -> Optional[Dict[str, object]]:
         owner, repo = self.config.owner_repo
-        latest_url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
-        try:
-            release = self._request_json(latest_url)
-        except GitHubAPIError as exc:
-            if not exc.transient:
-                raise
-            list_url = f"https://api.github.com/repos/{owner}/{repo}/releases?per_page=5"
+        page = 1
+        while True:
+            list_url = (
+                f"https://api.github.com/repos/{owner}/{repo}/releases"
+                f"?per_page={GITHUB_RELEASES_PER_PAGE}&page={page}"
+            )
             releases = self._request_json(list_url)
             if not isinstance(releases, list):
                 raise ProviderError(f"{self.config.name}: GitHub API returned invalid releases data")
-            release = self._select_latest_published_release(releases)
-            if release is None:
-                raise ProviderError(f"{self.config.name}: no published GitHub releases found")
-        if not isinstance(release, dict):
-            raise ProviderError(f"{self.config.name}: GitHub API returned invalid release data")
-        return release
+            selected = self._select_latest_eligible_release(releases)
+            if selected is not None:
+                return selected
+            if len(releases) < GITHUB_RELEASES_PER_PAGE:
+                return None
+            page += 1
 
-    def _select_latest_published_release(
+    def _select_latest_eligible_release(
         self, releases: List[object]
     ) -> Optional[Dict[str, object]]:
         for release in releases:
@@ -150,7 +151,8 @@ class GitHubReleaseProvider:
                 continue
             if release.get("draft") or release.get("prerelease"):
                 continue
-            return release
+            if self._release_is_old_enough(release):
+                return release
         return None
 
     def _matching_assets(self, release: Mapping[str, object]) -> List[Dict[str, object]]:

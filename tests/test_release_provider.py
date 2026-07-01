@@ -55,7 +55,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             )
             self.assertEqual([asset["name"] for asset in assets], ["prec.rpm"])
 
-    def test_refresh_removes_stale_cache_when_release_is_too_new(self):
+    def test_refresh_keeps_existing_cache_when_no_release_is_old_enough(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp)
             config.minimum_release_age = 3600
@@ -74,16 +74,13 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 },
             )
             provider = GitHubReleaseProvider(config)
-            release = {
-                "published_at": (
-                    datetime.now(timezone.utc) - timedelta(seconds=60)
-                ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-            }
+            release = None
 
-            with mock.patch.object(provider, "_fetch_latest_release", return_value=release):
+            with mock.patch.object(provider, "_fetch_latest_eligible_release", return_value=release):
                 self.assertFalse(provider.refresh())
 
-            self.assertFalse(os.path.exists(config.cache_path))
+            self.assertTrue(os.path.isdir(config.cache_path))
+            self.assertTrue(os.path.isdir(os.path.join(config.cache_path, "repodata")))
 
     def test_matching_assets_excludes_debug_and_source_rpms_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -276,35 +273,59 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             self.assertEqual(urlopen_mock.call_count, 2)
             sleep_mock.assert_called_once_with(1.0)
 
-    def test_fetch_latest_release_falls_back_to_releases_list(self):
+    def test_fetch_latest_eligible_release_skips_too_new_latest(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))
-            transient = urllib.error.HTTPError(
-                url="https://api.github.com/repos/jfut/prec/releases/latest",
-                code=504,
-                msg="Gateway Timeout",
-                hdrs=None,
-                fp=None,
-            )
-            list_response = mock.Mock()
-            list_response.read.return_value = (
-                b'[{"tag_name":"v-next","draft":true},'
+            provider.config.minimum_release_age = 3 * 86400
+            response = mock.Mock()
+            response.read.return_value = (
+                b'[{"tag_name":"v2","published_at":"2026-06-30T00:00:00Z","assets":[]},'
                 b'{"tag_name":"v1","published_at":"2026-06-21T00:00:00Z","assets":[]}]'
             )
-            list_response.__enter__ = mock.Mock(return_value=list_response)
-            list_response.__exit__ = mock.Mock(return_value=False)
-            with mock.patch("time.sleep"):
-                with mock.patch(
-                    "urllib.request.urlopen",
-                    side_effect=[
-                        transient,
-                        transient,
-                        transient,
-                        list_response,
-                    ],
-                ):
-                    release = provider._fetch_latest_release()
+            response.__enter__ = mock.Mock(return_value=response)
+            response.__exit__ = mock.Mock(return_value=False)
+            with mock.patch("urllib.request.urlopen", return_value=response):
+                release = provider._fetch_latest_eligible_release()
             self.assertEqual(release["tag_name"], "v1")
+
+    def test_fetch_latest_eligible_release_returns_none_when_no_release_is_old_enough(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            provider.config.minimum_release_age = 3 * 86400
+            response = mock.Mock()
+            response.read.return_value = (
+                b'[{"tag_name":"v2","published_at":"2026-06-30T00:00:00Z","assets":[]},'
+                b'{"tag_name":"v-next","draft":true,"published_at":"2026-06-20T00:00:00Z","assets":[]}]'
+            )
+            response.__enter__ = mock.Mock(return_value=response)
+            response.__exit__ = mock.Mock(return_value=False)
+            with mock.patch("urllib.request.urlopen", return_value=response):
+                release = provider._fetch_latest_eligible_release()
+            self.assertIsNone(release)
+
+    def test_fetch_latest_eligible_release_checks_additional_pages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            provider.config.minimum_release_age = 3 * 86400
+            first_page = [
+                {
+                    "tag_name": f"v-next-{index}",
+                    "published_at": "2026-06-30T00:00:00Z",
+                    "assets": [],
+                }
+                for index in range(100)
+            ]
+            second_page = [
+                {
+                    "tag_name": "v1",
+                    "published_at": "2026-06-21T00:00:00Z",
+                    "assets": [],
+                }
+            ]
+            with mock.patch.object(provider, "_request_json", side_effect=[first_page, second_page]) as request_mock:
+                release = provider._fetch_latest_eligible_release()
+            self.assertEqual(release["tag_name"], "v1")
+            self.assertEqual(request_mock.call_count, 2)
 
     def test_request_json_includes_github_error_message(self):
         with tempfile.TemporaryDirectory() as tmp:
