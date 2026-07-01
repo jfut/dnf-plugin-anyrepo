@@ -26,7 +26,12 @@ from dnf_plugin_anyrepo.config import (
     unset_value,
     validate_repo_name,
 )
-from dnf_plugin_anyrepo.dnf_plugin import repo_switch_gpgcheck
+from dnf_plugin_anyrepo.dnf_plugin import (
+    github_debug_repo_id,
+    github_repo_id,
+    github_source_repo_id,
+    repo_switch_gpgcheck,
+)
 from dnf_plugin_anyrepo.manager import RepositoryManager
 
 GLOBAL_REFRESH_KEYS = {
@@ -149,10 +154,12 @@ def _run(args: argparse.Namespace) -> int:
         manager = RepositoryManager(config_path=args.config)
         if args.name:
             changed = manager.refresh(args.name, force=args.force)
+            _clear_dnf_metadata_cache(manager.repo(args.name))
             # Keep refresh output aligned with other CLI messages and include config context.
             _print_refresh_result(args.config, args.name, changed)
         else:
             for name, changed in manager.refresh_all(force=args.force):
+                _clear_dnf_metadata_cache(manager.repo(name))
                 # Reuse the same display format for batch refresh output.
                 _print_refresh_result(args.config, name, changed)
         return 0
@@ -193,6 +200,17 @@ def _repo_cache_path_for_remove(path: str, repo_name: str) -> str:
     main_cache_dir = parser.get("main", "cache_dir", fallback=DEFAULT_CACHE_DIR)
     repo_cache_dir = parser.get(repo_name, "cache_dir", fallback=main_cache_dir)
     return os.path.join(repo_cache_dir, repo_name)
+
+
+def _clear_dnf_metadata_cache(repo) -> None:
+    # Drop DNF's cached metadata so the next transaction sees the refreshed AnyRepo contents.
+    local_repo.clear_dnf_repo_metadata(
+        [
+            github_repo_id(repo),
+            github_debug_repo_id(repo),
+            github_source_repo_id(repo),
+        ]
+    )
 
 
 def _run_repo_set(args: argparse.Namespace) -> int:
