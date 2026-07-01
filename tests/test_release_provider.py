@@ -11,6 +11,7 @@ from unittest import mock
 
 from dnf_plugin_anyrepo.config import RepoConfig
 from dnf_plugin_anyrepo.providers.github_release import ProviderError, GitHubReleaseProvider
+from dnf_plugin_anyrepo.state import save_state
 
 
 class GitHubReleaseProviderTest(unittest.TestCase):
@@ -53,6 +54,36 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 {"assets": [{"name": "prec.rpm"}, {"name": "checksums.txt"}]}
             )
             self.assertEqual([asset["name"] for asset in assets], ["prec.rpm"])
+
+    def test_refresh_removes_stale_cache_when_release_is_too_new(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp)
+            config.minimum_release_age = 3600
+            os.makedirs(os.path.join(config.cache_path, "repodata"))
+            os.makedirs(os.path.join(config.cache_path, "packages"))
+            with open(
+                os.path.join(config.cache_path, "packages", "prec-0.2.1-1.x86_64.rpm"),
+                "wb",
+            ) as fh:
+                fh.write(b"rpm")
+            save_state(
+                config.cache_path,
+                {
+                    "asset_names": ["prec-0.2.1-1.x86_64.rpm"],
+                    "last_refresh_at": "2026-06-21T00:00:00Z",
+                },
+            )
+            provider = GitHubReleaseProvider(config)
+            release = {
+                "published_at": (
+                    datetime.now(timezone.utc) - timedelta(seconds=60)
+                ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            }
+
+            with mock.patch.object(provider, "_fetch_latest_release", return_value=release):
+                self.assertFalse(provider.refresh())
+
+            self.assertFalse(os.path.exists(config.cache_path))
 
     def test_matching_assets_excludes_debug_and_source_rpms_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:

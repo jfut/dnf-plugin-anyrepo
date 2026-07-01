@@ -9,6 +9,7 @@ import unittest
 from unittest import mock
 
 from dnf_plugin_anyrepo.cli import main
+from dnf_plugin_anyrepo.config import RepoConfig
 
 
 SSL_CERT_REPO = "sslcert-cli"
@@ -253,6 +254,37 @@ class CliTest(unittest.TestCase):
                     ]
                 ),
             )
+
+    def test_refresh_clears_dnf_metadata_for_repo(self):
+        repo = RepoConfig(
+            name="prec",
+            source="github-release",
+            url="https://github.com/jfut/prec",
+            asset_include=r".*\.rpm$",
+            enabled=True,
+            minimum_release_age=0,
+            cache_dir="/tmp",
+            refresh_interval=600,
+        )
+        manager = mock.Mock()
+        manager.refresh.return_value = False
+        manager.repo.return_value = repo
+        stdout = io.StringIO()
+
+        with mock.patch("dnf_plugin_anyrepo.cli.RepositoryManager", return_value=manager):
+            with mock.patch("dnf_plugin_anyrepo.cli.local_repo.clear_dnf_repo_metadata") as clear_mock:
+                with contextlib.redirect_stdout(stdout):
+                    result = main(["refresh", "prec"])
+
+        self.assertEqual(result, 0)
+        clear_mock.assert_called_once_with(
+            [
+                "github.com:jfut:prec",
+                "github.com:jfut:prec-debuginfo",
+                "github.com:jfut:prec-source",
+            ]
+        )
+        self.assertEqual(stdout.getvalue().strip(), "[prec] unchanged (/etc/dnf/plugins/anyrepo.conf)")
 
     def test_global_unset_prints_config_path_after_message(self):
         with tempfile.TemporaryDirectory() as tmp:

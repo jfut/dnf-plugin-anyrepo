@@ -53,9 +53,9 @@ class GitHubReleaseProvider:
 
         release = self._fetch_latest_release()
         if not self._release_is_old_enough(release):
-            if self.state and local_repo.has_repodata(self.config.cache_path):
-                self.state["last_refresh_at"] = utcnow_iso()
-                save_state(self.config.cache_path, self.state)
+            # Remove stale repodata so DNF stops exposing packages until the release ages in.
+            local_repo.remove_cache(self.config.cache_path)
+            self.state = {}
             return False
 
         assets = self._matching_assets(release)

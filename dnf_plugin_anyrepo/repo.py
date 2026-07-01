@@ -3,14 +3,18 @@
 
 """Local repository cache and createrepo_c orchestration."""
 
+import configparser
 import os
 import shutil
 import subprocess
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Optional
 
 
 class RepoError(RuntimeError):
     """Raised when the local RPM repository cannot be prepared."""
+
+
+DEFAULT_DNF_CACHE_DIR = "/var/cache/dnf"
 
 
 def packages_dir(cache_path: str) -> str:
@@ -60,6 +64,47 @@ def replace_cache(source_path: str, cache_path: str) -> None:
 def remove_cache(cache_path: str) -> None:
     if os.path.isdir(cache_path):
         shutil.rmtree(cache_path)
+
+
+def dnf_cache_dir(config_path: str = "/etc/dnf/dnf.conf") -> str:
+    """Read DNF's cachedir so repo-specific metadata can be purged safely."""
+
+    parser = configparser.ConfigParser()
+    parser.read(config_path)
+    cachedir = parser.get("main", "cachedir", fallback=DEFAULT_DNF_CACHE_DIR)
+    return os.path.abspath(cachedir)
+
+
+def clear_dnf_repo_metadata(repoids: Iterable[str], cache_dir: Optional[str] = None) -> int:
+    """Drop cached DNF metadata entries for the specified repository ids."""
+
+    root = os.path.abspath(cache_dir or dnf_cache_dir())
+    if not os.path.isdir(root):
+        return 0
+
+    removed = 0
+    repoid_set = {repoid for repoid in repoids if repoid}
+    for entry in os.listdir(root):
+        if not _matches_dnf_cache_entry(entry, repoid_set):
+            continue
+        target = os.path.join(root, entry)
+        if os.path.isdir(target) and not os.path.islink(target):
+            shutil.rmtree(target)
+        else:
+            os.unlink(target)
+        removed += 1
+    return removed
+
+
+def _matches_dnf_cache_entry(entry: str, repoids: Iterable[str]) -> bool:
+    for repoid in repoids:
+        if entry == repoid:
+            return True
+        if entry.startswith(f"{repoid}-"):
+            return True
+        if entry.startswith(f"{repoid}."):
+            return True
+    return False
 
 
 def desired_asset_changed(state: Mapping[str, object], release: Mapping[str, object], assets: Iterable[Mapping[str, object]]) -> bool:
