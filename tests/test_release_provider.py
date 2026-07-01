@@ -326,7 +326,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             )
             self.assertEqual(
                 str(ctx.exception),
-                f"prec: GitHub API returned HTTP 403: API rate limit exceeded for 203.0.113.10. The rate limit will reset at {expected_reset_at}.",
+                f"prec: GitHub API returned HTTP 403: API rate limit exceeded for 203.0.113.10.\nThe rate limit will reset at {expected_reset_at}.",
             )
 
     def test_request_json_ignores_rate_limit_reset_lookup_failure(self):
