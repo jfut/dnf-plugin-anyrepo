@@ -16,6 +16,13 @@ SSL_CERT_REPO = "sslcert-cli"
 
 
 class CliTest(unittest.TestCase):
+    def setUp(self):
+        # Most CLI tests focus on configuration behavior, not live GitHub validation.
+        self.validate_repository = mock.patch(
+            "dnf_plugin_anyrepo.cli.validate_repository"
+        ).start()
+        self.addCleanup(mock.patch.stopall)
+
     def _repo_path(self, directory: str, name: str) -> str:
         # Repo-specific commands now operate on one file per repository.
         return os.path.join(directory, "anyrepo.d", f"{name}.conf")
@@ -31,6 +38,42 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(stdout.getvalue().strip(), f"[{SSL_CERT_REPO}] repo added ({repo_path})")
             self.assertTrue(os.path.isfile(repo_path))
+
+    def test_add_normalizes_github_url_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            repo_path = self._repo_path(tmp, "prec")
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = main(
+                    [
+                        "--config",
+                        path,
+                        "add",
+                        "https://github.com/jfut/prec/aaa/bbb/ccc",
+                    ]
+                )
+            self.assertEqual(result, 0)
+            with open(repo_path, encoding="utf-8") as fh:
+                self.assertIn("url = https://github.com/jfut/prec\n", fh.read())
+
+    def test_add_rejects_repository_without_compatible_release_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            error = RuntimeError("dummyrepo: GitHub API returned HTTP 404: Not Found")
+            stderr = io.StringIO()
+            with mock.patch(
+                "dnf_plugin_anyrepo.cli.validate_repository", side_effect=error
+            ), contextlib.redirect_stderr(stderr):
+                result = main(
+                    ["--config", path, "add", "https://github.com/dummy/dummyrepo"]
+                )
+            self.assertEqual(result, 1)
+            self.assertEqual(
+                stderr.getvalue().strip(),
+                "ERROR: [dummyrepo]: GitHub API returned HTTP 404: Not Found",
+            )
+            self.assertFalse(os.path.exists(path))
+            self.assertFalse(os.path.exists(self._repo_path(tmp, "dummyrepo")))
 
     def test_version_flag_prints_installed_rpm_version(self):
         stdout = io.StringIO()

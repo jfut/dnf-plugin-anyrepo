@@ -485,6 +485,9 @@ dnf-anyrepo add https://github.com/jfut/prec --github-token-file /etc/anyrepo/gi
 ```
 
 By default, each added repository is stored in `/etc/dnf/plugins/anyrepo.d/NAME.conf`.
+Before writing that file, `add` checks the latest 100 GitHub Releases for a published RPM that
+matches the selected asset, architecture, and release-version filters. Repositories without a
+compatible RPM in that range are rejected without changing the configuration.
 
 List repositories:
 
