@@ -78,7 +78,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 ):
                     provider.validate()
             self.assertEqual(request_mock.call_count, 1)
-            self.assertIn("page=1", request_mock.call_args.args[0])
+            self.assertIn("page=1", request_mock.call_args[0][0])
 
     def test_matching_assets_rejects_path_traversal_asset_name(self):
         with tempfile.TemporaryDirectory() as tmp:
