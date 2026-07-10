@@ -55,6 +55,12 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             )
             self.assertEqual([asset["name"] for asset in assets], ["prec.rpm"])
 
+    def test_matching_assets_rejects_path_traversal_asset_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            with self.assertRaises(ProviderError):
+                provider._matching_assets({"assets": [{"name": "../outside.rpm"}]})
+
     def test_refresh_keeps_existing_cache_when_no_release_is_old_enough(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp)

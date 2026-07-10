@@ -146,7 +146,7 @@ List repositories again after the `MIN_AGE` overrides are applied:
 # dnf-anyrepo list
 NAME                SOURCE          URL                                         ENABLED  GPGCHECK   MIN_AGE
 dnf-plugin-anyrepo  github-release  https://github.com/jfut/dnf-plugin-anyrepo  yes      global(1)  global(10h)
-firehol             github-release  https://github.com/firehol/packages         yes      global(1)  global(10h)
+firehol             github-release  https://github.com/firehol/packages         yes      0          global(10h)
 ipset-fast-update   github-release  https://github.com/jfut/ipset-fast-update   yes      global(1)  global(10h)
 nmcli-cli           github-release  https://github.com/jfut/nmcli-cli           yes      global(1)  3h
 prec                github-release  https://github.com/jfut/prec                yes      global(1)  global(10h)

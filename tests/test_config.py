@@ -241,8 +241,25 @@ class ConfigTest(unittest.TestCase):
             with self.assertRaises(ConfigError):
                 add_repo(path, "main", "https://github.com/jfut/prec")
             with self.assertRaises(ConfigError):
+                add_repo(path, ".", "https://github.com/jfut/prec")
+            with self.assertRaises(ConfigError):
+                add_repo(path, "..", "https://github.com/jfut/prec")
+            with self.assertRaises(ConfigError):
                 add_repo(path, "bad[name]", "https://github.com/jfut/prec")
+            with self.assertRaises(ConfigError):
+                add_repo(path, "../outside", "https://github.com/jfut/prec")
+            with self.assertRaises(ConfigError):
+                add_repo(path, "nested/repo", "https://github.com/jfut/prec")
             self.assertFalse(os.path.exists(path))
+
+    def test_load_config_rejects_unsafe_repo_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            for name in (".", "..", "../outside"):
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(f"[{name}]\nurl = https://github.com/jfut/prec\n")
+                with self.assertRaises(ConfigError):
+                    load_config(path)
 
     def test_load_warns_and_ignores_unknown_main_key(self):
         with tempfile.TemporaryDirectory() as tmp:

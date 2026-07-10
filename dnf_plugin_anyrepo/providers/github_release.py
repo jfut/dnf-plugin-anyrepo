@@ -197,8 +197,15 @@ class GitHubReleaseProvider:
                 continue
             if match_arch and not self._matches_arch(name):
                 continue
+            self._validate_asset_name(name)
             assets.append(asset)
         return self._filter_releasever_assets(assets)
+
+    def _validate_asset_name(self, name: str) -> None:
+        """Reject release asset names that could escape the package directory."""
+
+        if not name or name in {".", ".."} or any(char in name for char in "\x00/\\"):
+            raise ProviderError(f"{self.config.name}: invalid GitHub asset name: {name!r}")
 
     def _matches_arch(self, name: str) -> bool:
         """Apply the RPM arch filter while allowing noarch packages."""
