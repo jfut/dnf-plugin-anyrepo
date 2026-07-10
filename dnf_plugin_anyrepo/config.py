@@ -181,7 +181,10 @@ def validate_repo_name(name: str) -> str:
         raise ConfigError("repository name must not be empty")
     if normalized == "main":
         raise ConfigError("repository name must not be main")
-    if any(char in normalized for char in "\r\n[]"):
+    # Keep the alias from resolving to the cache directory itself or its parent.
+    if normalized in {".", ".."}:
+        raise ConfigError(f"invalid repository name: {name}")
+    if any(char in normalized for char in "\x00\r\n[]/\\"):
         raise ConfigError(f"invalid repository name: {name}")
     return normalized
 
@@ -441,6 +444,7 @@ def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
     for section in parser.sections():
         if section == "main":
             continue
+        validate_repo_name(section)
         item = parser[section]
         warn_unknown_options(section, item.keys(), warn=warn)
         source = item.get("source", DEFAULT_SOURCE)
@@ -490,6 +494,7 @@ def write_parser(parser: configparser.ConfigParser, path: str = DEFAULT_CONFIG_P
 def repo_config_path(path: str, section: str) -> str:
     """Resolve which file stores the named repository section."""
 
+    section = validate_repo_name(section)
     config = load_config(path)
     source_path = config.section_files.get(section)
     if source_path:
