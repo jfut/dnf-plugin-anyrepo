@@ -14,10 +14,15 @@ from dnf_plugin_anyrepo.config import (
     DEFAULT_CACHE_DIR,
     DEFAULT_CONFIG_PATH,
     ConfigError,
+    RepoConfig,
     add_repo,
+    current_arch,
+    current_releasever,
     format_duration,
     iter_repo_rows,
     load_config,
+    parse_duration,
+    parse_github_url,
     remove_section,
     repo_name_from_url,
     repo_config_path,
@@ -25,6 +30,8 @@ from dnf_plugin_anyrepo.config import (
     set_value,
     unset_value,
     validate_repo_name,
+    validate_repo_value,
+    validate_source,
 )
 from dnf_plugin_anyrepo.dnf_plugin import (
     github_debug_repo_id,
@@ -32,7 +39,7 @@ from dnf_plugin_anyrepo.dnf_plugin import (
     github_source_repo_id,
     repo_switch_gpgcheck,
 )
-from dnf_plugin_anyrepo.manager import RepositoryManager
+from dnf_plugin_anyrepo.manager import RepositoryManager, provider_for
 
 GLOBAL_REFRESH_KEYS = {
     "asset_exclude",
@@ -130,8 +137,11 @@ def _run(args: argparse.Namespace) -> int:
             values["enabled"] = "true"
         if args.disabled:
             values["enabled"] = "false"
-        name = validate_repo_name(args.name) if args.name else repo_name_from_url(args.url)
-        target_path = add_repo(args.config, name, args.url, args.source, values, force=args.force)
+        owner, repository = parse_github_url(args.url)
+        url = f"https://github.com/{owner}/{repository}"
+        name = validate_repo_name(args.name) if args.name else repo_name_from_url(url)
+        validate_repository(args.config, name, url, args.source, values)
+        target_path = add_repo(args.config, name, url, args.source, values, force=args.force)
         _print_mutation_result(target_path, f"[{name}] repo added")
         return 0
 
@@ -177,6 +187,36 @@ def _run(args: argparse.Namespace) -> int:
         raise ConfigError(f"unknown repo command: {args.repo_command}")
 
     raise ConfigError(f"unknown command: {args.command}")
+
+
+def validate_repository(path: str, name: str, url: str, source: str, values: dict) -> None:
+    """Verify a candidate repository before persisting its configuration."""
+
+    validate_source(source)
+    validate_repo_value(name, "url", url)
+    for key, value in values.items():
+        if value is not None:
+            validate_repo_value(name, key, value)
+
+    main = load_config(path).main
+    candidate = RepoConfig(
+        name=name,
+        source=source,
+        url=url,
+        asset_include=values["asset_include"] or main.asset_include,
+        asset_exclude=values["asset_exclude"] or main.asset_exclude,
+        enabled=True,
+        minimum_release_age=parse_duration(
+            values["minimum_release_age"] or main.minimum_release_age
+        ),
+        cache_dir=main.cache_dir or DEFAULT_CACHE_DIR,
+        refresh_interval=main.refresh_interval,
+        arch=values["arch"] or current_arch(),
+        releasever=values["releasever"] or current_releasever(),
+        github_token_file=values["github_token_file"],
+    )
+    # Providers perform a read-only API check and do not create cache or config files.
+    provider_for(candidate).validate()
 
 
 def _cli_version() -> str:

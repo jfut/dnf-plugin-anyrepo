@@ -55,6 +55,31 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             )
             self.assertEqual([asset["name"] for asset in assets], ["prec.rpm"])
 
+    def test_validate_accepts_a_published_release_with_matching_rpm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            with mock.patch.object(
+                provider,
+                "_request_json",
+                return_value=[{"draft": False, "prerelease": False, "assets": [{"name": "prec.rpm"}]}],
+            ):
+                provider.validate()
+
+    def test_validate_rejects_releases_without_matching_rpm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            with mock.patch.object(
+                provider,
+                "_request_json",
+                return_value=[{"draft": False, "prerelease": False, "assets": []}] * 100,
+            ) as request_mock:
+                with self.assertRaisesRegex(
+                    ProviderError, "no compatible RPM assets found in the latest 100"
+                ):
+                    provider.validate()
+            self.assertEqual(request_mock.call_count, 1)
+            self.assertIn("page=1", request_mock.call_args.args[0])
+
     def test_matching_assets_rejects_path_traversal_asset_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))

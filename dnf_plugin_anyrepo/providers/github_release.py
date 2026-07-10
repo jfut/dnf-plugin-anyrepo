@@ -96,6 +96,27 @@ class GitHubReleaseProvider:
         save_state(self.config.cache_path, self.state)
         return False
 
+    def validate(self) -> None:
+        """Ensure recent releases include an AnyRepo-compatible RPM asset."""
+
+        owner, repo = self.config.owner_repo
+        list_url = (
+            f"https://api.github.com/repos/{owner}/{repo}/releases"
+            f"?per_page={GITHUB_RELEASES_PER_PAGE}&page=1"
+        )
+        releases = self._request_json(list_url)
+        if not isinstance(releases, list):
+            raise ProviderError(f"{self.config.name}: GitHub API returned invalid releases data")
+        for release in releases:
+            if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
+                continue
+            if self._matching_assets(release):
+                return
+        raise ProviderError(
+            f"{self.config.name}: no compatible RPM assets found in the latest "
+            f"{GITHUB_RELEASES_PER_PAGE} GitHub Releases"
+        )
+
     def list_assets(self) -> List[Mapping[str, object]]:
         return list(self.assets)
 
