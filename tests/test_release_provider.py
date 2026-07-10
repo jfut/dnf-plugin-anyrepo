@@ -277,11 +277,20 @@ class GitHubReleaseProviderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))
             provider.config.minimum_release_age = 3 * 86400
+            too_new = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            old_enough = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
             response = mock.Mock()
             response.read.return_value = (
-                b'[{"tag_name":"v2","published_at":"2026-06-30T00:00:00Z","assets":[]},'
-                b'{"tag_name":"v1","published_at":"2026-06-21T00:00:00Z","assets":[]}]'
-            )
+                (
+                    '[{"tag_name":"v2","published_at":"%s","assets":[]},'
+                    '{"tag_name":"v1","published_at":"%s","assets":[]}]'
+                )
+                % (too_new, old_enough)
+            ).encode("utf-8")
             response.__enter__ = mock.Mock(return_value=response)
             response.__exit__ = mock.Mock(return_value=False)
             with mock.patch("urllib.request.urlopen", return_value=response):
@@ -292,11 +301,15 @@ class GitHubReleaseProviderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))
             provider.config.minimum_release_age = 3 * 86400
+            too_new = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
             response = mock.Mock()
             response.read.return_value = (
-                b'[{"tag_name":"v2","published_at":"2026-06-30T00:00:00Z","assets":[]},'
-                b'{"tag_name":"v-next","draft":true,"published_at":"2026-06-20T00:00:00Z","assets":[]}]'
-            )
+                '[{"tag_name":"v2","published_at":"%s","assets":[]},'
+                '{"tag_name":"v-next","draft":true,"published_at":"2020-01-01T00:00:00Z","assets":[]}]'
+                % too_new
+            ).encode("utf-8")
             response.__enter__ = mock.Mock(return_value=response)
             response.__exit__ = mock.Mock(return_value=False)
             with mock.patch("urllib.request.urlopen", return_value=response):
@@ -307,10 +320,16 @@ class GitHubReleaseProviderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))
             provider.config.minimum_release_age = 3 * 86400
+            too_new = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            old_enough = (datetime.now(timezone.utc) - timedelta(days=10)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
             first_page = [
                 {
                     "tag_name": f"v-next-{index}",
-                    "published_at": "2026-06-30T00:00:00Z",
+                    "published_at": too_new,
                     "assets": [],
                 }
                 for index in range(100)
@@ -318,7 +337,7 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             second_page = [
                 {
                     "tag_name": "v1",
-                    "published_at": "2026-06-21T00:00:00Z",
+                    "published_at": old_enough,
                     "assets": [],
                 }
             ]
