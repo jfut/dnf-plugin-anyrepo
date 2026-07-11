@@ -45,6 +45,8 @@ dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/
 dnf install https://github.com/jfut/dnf-plugin-anyrepo/releases/download/vX.Y.Z/dnf-plugin-anyrepo-x.y.z-n.el10.noarch.rpm
 ```
 
+When `bash-completion` is installed and loaded by the interactive Bash session, `dnf-anyrepo` command completion is available. The RPM installs its completion script under `/usr/share/bash-completion/completions/dnf-anyrepo`.
+
 ## Example workflow
 
 If the RPM public signing key is available, import it first:
@@ -253,12 +255,10 @@ When enabled, the plugin:
 
 ## Configuration
 
-The `dnf-plugin-anyrepo` RPM package installs:
+The `dnf-plugin-anyrepo` RPM package installs these configuration files:
 
 - `/etc/dnf/plugins/anyrepo.conf`
 - `/etc/yum.repos.d/anyrepo.repo`
-- `dnf-anyrepo`
-- the DNF plugin shim under `dnf-plugins/anyrepo.py`
 
 Main config path:
 

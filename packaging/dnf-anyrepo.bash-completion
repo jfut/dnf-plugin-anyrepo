@@ -1,0 +1,165 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the dnf-plugin-anyrepo project.
+
+# Complete dnf-anyrepo commands, options, configuration keys, and repository names.
+_dnf_anyrepo_repositories()
+{
+    local config=$1
+
+    command dnf-anyrepo --config "$config" list 2>/dev/null | awk 'NR > 1 { print $1 }'
+}
+
+_dnf_anyrepo_complete()
+{
+    local cur prev config command index word
+    local -a args
+    local -a words
+    local -a options
+
+    cur=${COMP_WORDS[COMP_CWORD]}
+    prev=${COMP_WORDS[COMP_CWORD - 1]}
+    config=/etc/dnf/plugins/anyrepo.conf
+    # Keep only words before the cursor; the current partial word is completed below.
+    for ((index = 1; index < COMP_CWORD; index++)); do
+        words+=("${COMP_WORDS[index]}")
+    done
+
+    # Remove global options so command positions remain stable with --config.
+    index=0
+    while [ "$index" -lt "${#words[@]}" ]; do
+        word=${words[index]}
+        case "$word" in
+            --config)
+                index=$((index + 1))
+                if [ "$index" -lt "${#words[@]}" ]; then
+                    config=${words[index]}
+                fi
+                ;;
+            --config=*)
+                config=${word#--config=}
+                ;;
+            --version|-v)
+                ;;
+            *)
+                args+=("$word")
+                ;;
+        esac
+        index=$((index + 1))
+    done
+
+    case "$prev" in
+        --config)
+            COMPREPLY=( $(compgen -f -- "$cur") )
+            return
+            ;;
+        --github-token-file)
+            COMPREPLY=( $(compgen -f -- "$cur") )
+            return
+            ;;
+        --source)
+            COMPREPLY=( $(compgen -W 'github-release' -- "$cur") )
+            return
+            ;;
+    esac
+
+    if [ "${#args[@]}" -eq 0 ]; then
+        COMPREPLY=( $(compgen -W 'add remove list refresh global repo --config --version -v' -- "$cur") )
+        return
+    fi
+
+    command=${args[0]}
+    case "$command" in
+        add)
+            options=(
+                -n --name --source --asset-include --asset-exclude --arch
+                --releasever --minimum-release-age --github-token-file
+                --enabled --disabled --force
+            )
+            ;;
+        remove)
+            if [ "${#args[@]}" -eq 1 ]; then
+                COMPREPLY=( $(compgen -W "$(_dnf_anyrepo_repositories "$config")" -- "$cur") )
+                return
+            fi
+            options=(-p --purge-cache)
+            ;;
+        refresh)
+            if [ "${#args[@]}" -eq 1 ]; then
+                COMPREPLY=( $(compgen -W "$(_dnf_anyrepo_repositories "$config") -f --force" -- "$cur") )
+                return
+            fi
+            options=(-f --force)
+            ;;
+        global)
+            if [ "${#args[@]}" -eq 1 ]; then
+                COMPREPLY=( $(compgen -W 'get set unset' -- "$cur") )
+                return
+            fi
+            case "${args[1]}" in
+                get|unset)
+                    if [ "${#args[@]}" -eq 2 ]; then
+                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age refresh_interval' -- "$cur") )
+                    fi
+                    return
+                    ;;
+                set)
+                    if [ "${#args[@]}" -eq 2 ]; then
+                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age refresh_interval' -- "$cur") )
+                    elif [ "${#args[@]}" -eq 3 ] && [ "${args[2]}" = debug ]; then
+                        COMPREPLY=( $(compgen -W 'true false 1 0 yes no on off' -- "$cur") )
+                    fi
+                    return
+                    ;;
+            esac
+            return
+            ;;
+        repo)
+            if [ "${#args[@]}" -eq 1 ]; then
+                COMPREPLY=( $(compgen -W "$(_dnf_anyrepo_repositories "$config")" -- "$cur") )
+                return
+            fi
+            if [ "${#args[@]}" -eq 2 ]; then
+                COMPREPLY=( $(compgen -W 'set unset' -- "$cur") )
+                return
+            fi
+            case "${args[2]}" in
+                unset)
+                    if [ "${#args[@]}" -eq 3 ]; then
+                        COMPREPLY=( $(compgen -W 'arch asset_exclude asset_include cache_dir enabled github_token_file gpgcheck minimum_release_age refresh_interval releasever source url' -- "$cur") )
+                    fi
+                    return
+                    ;;
+                set)
+                    if [ "${#args[@]}" -eq 3 ]; then
+                        COMPREPLY=( $(compgen -W 'arch asset_exclude asset_include cache_dir enabled github_token_file gpgcheck minimum_release_age refresh_interval releasever source url' -- "$cur") )
+                    elif [ "${#args[@]}" -eq 4 ]; then
+                        case "${args[3]}" in
+                            enabled|gpgcheck)
+                                COMPREPLY=( $(compgen -W 'true false 1 0 yes no on off' -- "$cur") )
+                                ;;
+                            source)
+                                COMPREPLY=( $(compgen -W 'github-release' -- "$cur") )
+                                ;;
+                            github_token_file)
+                                COMPREPLY=( $(compgen -f -- "$cur") )
+                                ;;
+                        esac
+                    fi
+                    return
+                    ;;
+            esac
+            return
+            ;;
+        list)
+            return
+            ;;
+        *)
+            COMPREPLY=( $(compgen -W 'add remove list refresh global repo --config --version -v' -- "$cur") )
+            return
+            ;;
+    esac
+
+    COMPREPLY=( $(compgen -W "${options[*]}" -- "$cur") )
+}
+
+complete -F _dnf_anyrepo_complete dnf-anyrepo

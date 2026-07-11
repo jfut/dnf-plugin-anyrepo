@@ -75,6 +75,12 @@ nfpms:
           mode: 0755
           owner: root
           group: root
+      - src: packaging/dnf-anyrepo.bash-completion
+        dst: /usr/share/bash-completion/completions/dnf-anyrepo
+        file_info:
+          mode: 0644
+          owner: root
+          group: root
       - src: build/goreleaser/dnf_plugin_anyrepo/
         dst: /usr/lib/python3.6/site-packages/dnf_plugin_anyrepo
         type: tree
@@ -143,6 +149,12 @@ nfpms:
           mode: 0755
           owner: root
           group: root
+      - src: packaging/dnf-anyrepo.bash-completion
+        dst: /usr/share/bash-completion/completions/dnf-anyrepo
+        file_info:
+          mode: 0644
+          owner: root
+          group: root
       - src: build/goreleaser/dnf_plugin_anyrepo/
         dst: /usr/lib/python3.9/site-packages/dnf_plugin_anyrepo
         type: tree
@@ -209,6 +221,12 @@ nfpms:
         dst: /usr/bin/dnf-anyrepo
         file_info:
           mode: 0755
+          owner: root
+          group: root
+      - src: packaging/dnf-anyrepo.bash-completion
+        dst: /usr/share/bash-completion/completions/dnf-anyrepo
+        file_info:
+          mode: 0644
           owner: root
           group: root
       - src: build/goreleaser/dnf_plugin_anyrepo/
