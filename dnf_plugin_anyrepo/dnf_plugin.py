@@ -224,6 +224,8 @@ if dnf is not None:
             dnf_repo.enabled = enabled
             dnf_repo.skip_if_unavailable = True
             dnf_repo.metadata_expire = 0
+            # Apply the inherited or repository-specific priority to DNF's dynamic repo.
+            dnf_repo.priority = repo.priority
             dnf_repo.gpgcheck = effective_repo_gpgcheck(
                 repo,
                 getattr(self, "_anyrepo_gpgcheck", False),

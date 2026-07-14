@@ -17,6 +17,7 @@ from dnf_plugin_anyrepo.config import (
     load_config,
     parse_duration,
     parse_github_url,
+    parse_priority,
     repo_name_from_url,
     set_value,
 )
@@ -28,6 +29,13 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(parse_duration("30m"), 1800)
         self.assertEqual(parse_duration("1h"), 3600)
         self.assertEqual(parse_duration("2d"), 172800)
+
+    def test_parse_priority(self):
+        self.assertEqual(parse_priority("10"), 10)
+        self.assertEqual(parse_priority("0"), 0)
+        self.assertEqual(parse_priority("100"), 100)
+        with self.assertRaises(ConfigError):
+            parse_priority("high")
 
     def test_parse_github_url(self):
         self.assertEqual(parse_github_url("https://github.com/jfut/prec"), ("jfut", "prec"))
@@ -52,7 +60,21 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(config.repos["prec"].asset_exclude, DEFAULT_ASSET_EXCLUDE)
             self.assertTrue(config.repos["prec"].enabled)
             self.assertIsNone(config.repos["prec"].gpgcheck)
+            self.assertEqual(config.main.priority, 99)
+            self.assertEqual(config.repos["prec"].priority, 99)
             self.assertFalse(config.main.debug)
+
+    def test_load_repo_priority_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\npriority = 50\n\n"
+                    "[prec]\nurl = https://github.com/jfut/prec\npriority = 10\n"
+                )
+            config = load_config(path)
+            self.assertEqual(config.main.priority, 50)
+            self.assertEqual(config.repos["prec"].priority, 10)
 
     def test_load_main_reads_asset_filters(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -203,6 +225,8 @@ class ConfigTest(unittest.TestCase):
             with self.assertRaises(ConfigError):
                 set_value(path, "prec", "gpgcheck", "maybe")
             with self.assertRaises(ConfigError):
+                set_value(path, "prec", "priority", "high")
+            with self.assertRaises(ConfigError):
                 set_value(path, "prec", "refresh_interval", "soon")
             with self.assertRaises(ConfigError):
                 set_value(path, "prec", "url", "https://example.com/jfut/prec")
@@ -220,6 +244,8 @@ class ConfigTest(unittest.TestCase):
                 set_value(path, "main", "asset_exclude", "[")
             with self.assertRaises(ConfigError):
                 set_value(path, "main", "minimum_release_age", "later")
+            with self.assertRaises(ConfigError):
+                set_value(path, "main", "priority", "high")
             with self.assertRaises(ConfigError):
                 set_value(path, "main", "unknown_key", "value")
 

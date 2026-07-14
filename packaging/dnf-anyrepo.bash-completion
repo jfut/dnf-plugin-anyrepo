@@ -72,7 +72,7 @@ _dnf_anyrepo_complete()
         add)
             options=(
                 -n --name --source --asset-include --asset-exclude --arch
-                --releasever --minimum-release-age --github-token-file
+                --releasever --minimum-release-age --priority --github-token-file
                 --enabled --disabled --force
             )
             ;;
@@ -98,13 +98,13 @@ _dnf_anyrepo_complete()
             case "${args[1]}" in
                 get|unset)
                     if [ "${#args[@]}" -eq 2 ]; then
-                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age refresh_interval' -- "$cur") )
+                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age priority refresh_interval' -- "$cur") )
                     fi
                     return
                     ;;
                 set)
                     if [ "${#args[@]}" -eq 2 ]; then
-                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age refresh_interval' -- "$cur") )
+                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age priority refresh_interval' -- "$cur") )
                     elif [ "${#args[@]}" -eq 3 ] && [ "${args[2]}" = debug ]; then
                         COMPREPLY=( $(compgen -W 'true false 1 0 yes no on off' -- "$cur") )
                     fi
@@ -125,13 +125,13 @@ _dnf_anyrepo_complete()
             case "${args[2]}" in
                 unset)
                     if [ "${#args[@]}" -eq 3 ]; then
-                        COMPREPLY=( $(compgen -W 'arch asset_exclude asset_include cache_dir enabled github_token_file gpgcheck minimum_release_age refresh_interval releasever source url' -- "$cur") )
+                        COMPREPLY=( $(compgen -W 'arch asset_exclude asset_include cache_dir enabled github_token_file gpgcheck minimum_release_age priority refresh_interval releasever source url' -- "$cur") )
                     fi
                     return
                     ;;
                 set)
                     if [ "${#args[@]}" -eq 3 ]; then
-                        COMPREPLY=( $(compgen -W 'arch asset_exclude asset_include cache_dir enabled github_token_file gpgcheck minimum_release_age refresh_interval releasever source url' -- "$cur") )
+                        COMPREPLY=( $(compgen -W 'arch asset_exclude asset_include cache_dir enabled github_token_file gpgcheck minimum_release_age priority refresh_interval releasever source url' -- "$cur") )
                     elif [ "${#args[@]}" -eq 4 ]; then
                         case "${args[3]}" in
                             enabled|gpgcheck)

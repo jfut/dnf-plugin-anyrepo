@@ -100,6 +100,7 @@ cache_dir: global(/var/cache/dnf/anyrepo)
 enabled: true
 github_token_file:
 minimum_release_age: global(3d)
+priority: global(99)
 refresh_interval: global(10m)
 releasever: el10
 source: github-release
@@ -280,6 +281,7 @@ include = /etc/dnf/plugins/anyrepo.d
 cache_dir = /var/cache/dnf/anyrepo
 refresh_interval = 600
 minimum_release_age = 3d
+priority = 99
 debug = 0
 asset_include = .*\.rpm$
 asset_exclude = (?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
@@ -318,6 +320,7 @@ Default values:
 cache_dir=/var/cache/dnf/anyrepo
 refresh_interval=600
 minimum_release_age=259200
+priority=99
 debug=0
 source=github-release
 enabled=true
@@ -337,6 +340,7 @@ Per-repository sections support these keys:
 - `github_token_file`
 - `gpgcheck`
 - `minimum_release_age`
+- `priority`
 - `refresh_interval`
 - `releasever`
 - `source`
@@ -347,6 +351,7 @@ Notes:
 - `asset_exclude` is a regular expression applied after `asset_include`, and matching assets are skipped
 - `enabled = false` disables only that repository
 - `github_token_file` is read and used as a GitHub API bearer token
+- `priority` is an integer; lower values take precedence
 
 ## Asset selection
 
@@ -430,12 +435,6 @@ dnf-anyrepo repo NAME set minimum_release_age 30m
 
 # Remove the repository-specific override.
 dnf-anyrepo repo NAME unset minimum_release_age
-
-# Override the inherited gpgcheck value for one repository.
-dnf-anyrepo repo NAME set gpgcheck 1
-
-# Inherit gpgcheck from /etc/yum.repos.d/anyrepo.repo again.
-dnf-anyrepo repo NAME unset gpgcheck
 ```
 
 The `global` commands update `[main]` and affect repositories that inherit the global setting.
@@ -480,6 +479,7 @@ dnf-anyrepo add https://github.com/firehol/packages -n firehol
 dnf-anyrepo add https://github.com/jfut/prec --asset-include '.*\.rpm$'
 dnf-anyrepo add https://github.com/jfut/prec --asset-exclude '$^'
 dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 30m
+dnf-anyrepo add https://github.com/jfut/prec --priority 25
 dnf-anyrepo add https://github.com/jfut/prec --arch x86_64 --releasever el10
 dnf-anyrepo add https://github.com/jfut/prec --github-token-file /etc/anyrepo/github.token
 ```
@@ -510,6 +510,7 @@ Repository settings:
 dnf-anyrepo repo prec
 dnf-anyrepo repo prec set minimum_release_age 1d
 dnf-anyrepo repo prec set enabled false
+dnf-anyrepo repo prec set priority 50
 dnf-anyrepo repo prec set gpgcheck 1
 dnf-anyrepo repo prec set asset_exclude '$^'
 dnf-anyrepo repo prec unset minimum_release_age
