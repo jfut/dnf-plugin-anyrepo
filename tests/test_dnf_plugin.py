@@ -193,6 +193,25 @@ class DnfPluginTest(unittest.TestCase):
             self.assertFalse(dnf_repo.repo_gpgcheck)
 
     @unittest.skipIf(dnf is None, "dnf is not available")
+    def test_added_repo_uses_priority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = RepoConfig(
+                name="prec",
+                source="github-release",
+                url="https://github.com/jfut/prec",
+                asset_include=r".*\.rpm$",
+                enabled=True,
+                minimum_release_age=0,
+                cache_dir=tmp,
+                refresh_interval=600,
+                priority=10,
+            )
+            base = dnf.Base()
+            plugin = AnyRepoPlugin(base, None)
+            plugin._add_file_repo(repo)
+            self.assertEqual(base.repos[github_repo_id(repo)].priority, 10)
+
+    @unittest.skipIf(dnf is None, "dnf is not available")
     def test_warn_unsigned_packages_continues_with_assumeyes(self):
         base = dnf.Base()
         base.conf.assumeyes = True

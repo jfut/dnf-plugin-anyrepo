@@ -22,6 +22,7 @@ DEFAULT_MINIMUM_RELEASE_AGE = 3 * 86400
 DEFAULT_DEBUG = False
 DEFAULT_SOURCE = "github-release"
 DEFAULT_ENABLED = True
+DEFAULT_PRIORITY = 99
 DEFAULT_ASSET_INCLUDE = r".*\.rpm$"
 DEFAULT_ASSET_EXCLUDE = r"(?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)"
 LEGACY_REPO_KEYS = {
@@ -31,6 +32,7 @@ MAIN_CONFIG_KEYS = {
     "cache_dir",
     "refresh_interval",
     "minimum_release_age",
+    "priority",
     "debug",
     INCLUDE_KEY,
     "asset_include",
@@ -49,6 +51,7 @@ REPO_CONFIG_KEYS = {
     "releasever",
     "github_token_file",
     "gpgcheck",
+    "priority",
 }
 
 _DURATION_RE = re.compile(r"^\s*(\d+)\s*([smhd]?)\s*$")
@@ -64,6 +67,7 @@ class MainConfig:
         cache_dir=DEFAULT_CACHE_DIR,
         refresh_interval=DEFAULT_REFRESH_INTERVAL,
         minimum_release_age=DEFAULT_MINIMUM_RELEASE_AGE,
+        priority=DEFAULT_PRIORITY,
         debug=DEFAULT_DEBUG,
         include=None,
         asset_include=DEFAULT_ASSET_INCLUDE,
@@ -72,6 +76,7 @@ class MainConfig:
         self.cache_dir = cache_dir
         self.refresh_interval = refresh_interval
         self.minimum_release_age = minimum_release_age
+        self.priority = priority
         self.debug = debug
         self.include = include
         self.asset_include = asset_include
@@ -94,6 +99,7 @@ class RepoConfig:
         releasever=None,
         github_token_file=None,
         gpgcheck=None,
+        priority=DEFAULT_PRIORITY,
     ):
         self.name = name
         self.source = source
@@ -108,6 +114,7 @@ class RepoConfig:
         self.releasever = releasever
         self.github_token_file = github_token_file
         self.gpgcheck = gpgcheck
+        self.priority = priority
 
     @property
     def cache_path(self):
@@ -135,6 +142,8 @@ def validate_main_value(key: str, value: object) -> None:
         parse_duration(value)
     elif key == "minimum_release_age":
         parse_duration(value)
+    elif key == "priority":
+        parse_priority(value)
     elif key == "debug":
         parse_bool(value)
     elif key == "asset_include":
@@ -164,6 +173,8 @@ def validate_repo_value(section: str, key: str, value: object) -> None:
         parse_duration(value)
     elif key == "refresh_interval":
         parse_duration(value)
+    elif key == "priority":
+        parse_priority(value)
 
 
 def validate_config_value(section: str, key: str, value: object) -> None:
@@ -307,6 +318,16 @@ def parse_duration(value: object) -> int:
     return amount * multipliers[unit]
 
 
+def parse_priority(value: object) -> int:
+    """Validate and normalize the DNF repository priority."""
+
+    try:
+        priority = int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ConfigError("priority must be an integer") from exc
+    return priority
+
+
 def format_duration(value: Optional[int], inherited: bool = False) -> str:
     formatted = _format_duration_value(value)
     if inherited:
@@ -422,6 +443,7 @@ def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
         minimum_release_age=parse_duration(
             main_section.get("minimum_release_age", DEFAULT_MINIMUM_RELEASE_AGE)
         ),
+        priority=parse_priority(main_section.get("priority", DEFAULT_PRIORITY)),
         debug=parse_bool(main_section.get("debug", DEFAULT_DEBUG)),
         include=main_section.get(INCLUDE_KEY),
         asset_include=validate_asset_pattern(
@@ -464,6 +486,7 @@ def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
         )
         cache_dir = item.get("cache_dir", main.cache_dir)
         refresh_interval = parse_duration(item.get("refresh_interval", main.refresh_interval))
+        priority = parse_priority(item.get("priority", main.priority))
         gpgcheck = parse_bool(item["gpgcheck"]) if "gpgcheck" in item else None
         repos[section] = RepoConfig(
             name=section,
@@ -479,6 +502,7 @@ def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
             releasever=item.get("releasever") or current_releasever(),
             github_token_file=item.get("github_token_file"),
             gpgcheck=gpgcheck,
+            priority=priority,
         )
     return PluginConfig(path=path, main=main, repos=repos, section_files=section_files)
 

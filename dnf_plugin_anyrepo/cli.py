@@ -22,6 +22,7 @@ from dnf_plugin_anyrepo.config import (
     iter_repo_rows,
     load_config,
     parse_duration,
+    parse_priority,
     parse_github_url,
     remove_section,
     repo_name_from_url,
@@ -74,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--arch")
     add.add_argument("--releasever")
     add.add_argument("--minimum-release-age")
+    add.add_argument("--priority")
     add.add_argument("--github-token-file")
     state = add.add_mutually_exclusive_group()
     state.add_argument("--enabled", action="store_true")
@@ -131,6 +133,7 @@ def _run(args: argparse.Namespace) -> int:
             "arch": args.arch,
             "releasever": args.releasever,
             "minimum_release_age": args.minimum_release_age,
+            "priority": args.priority,
             "github_token_file": args.github_token_file,
         }
         if args.enabled:
@@ -209,6 +212,7 @@ def validate_repository(path: str, name: str, url: str, source: str, values: dic
         minimum_release_age=parse_duration(
             values["minimum_release_age"] or main.minimum_release_age
         ),
+        priority=parse_priority(values["priority"] or main.priority),
         cache_dir=main.cache_dir or DEFAULT_CACHE_DIR,
         refresh_interval=main.refresh_interval,
         arch=values["arch"] or current_arch(),
@@ -362,6 +366,7 @@ def _print_global_show(main) -> None:
         "debug": "true" if main.debug else "false",
         "refresh_interval": format_duration(main.refresh_interval),
         "minimum_release_age": format_duration(main.minimum_release_age),
+        "priority": str(main.priority),
     }
     for key, value in sorted(values.items()):
         _print_key_value(key, value)
@@ -377,6 +382,7 @@ def _print_repo_show(config, repo) -> None:
         "github_token_file": _format_repo_config_value(config, repo, "github_token_file"),
         "gpgcheck": _format_repo_config_value(config, repo, "gpgcheck"),
         "minimum_release_age": _format_repo_config_value(config, repo, "minimum_release_age"),
+        "priority": _format_repo_config_value(config, repo, "priority"),
         "refresh_interval": _format_repo_config_value(config, repo, "refresh_interval"),
         "releasever": _format_repo_config_value(config, repo, "releasever"),
         "source": _format_repo_config_value(config, repo, "source"),
@@ -424,6 +430,7 @@ def _format_repo_config_value(config, repo, key: str) -> str:
         "cache_dir",
         "refresh_interval",
         "minimum_release_age",
+        "priority",
     }
     if key in inherited_global_keys and key not in _section_options(config.path, repo.name):
         return f"global({_format_display_value(key, value)})"
@@ -462,6 +469,7 @@ def _describe_current_value(path: str, section: str, key: str) -> str:
         "cache_dir",
         "refresh_interval",
         "minimum_release_age",
+        "priority",
     }
     if inherited and key in inherited_global_keys:
         return f"global({_format_display_value(key, getattr(repo, key))})"

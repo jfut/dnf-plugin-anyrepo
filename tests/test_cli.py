@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 from dnf_plugin_anyrepo.cli import main
-from dnf_plugin_anyrepo.config import RepoConfig
+from dnf_plugin_anyrepo.config import RepoConfig, load_config
 
 
 SSL_CERT_REPO = "sslcert-cli"
@@ -293,6 +293,7 @@ class CliTest(unittest.TestCase):
                         "cache_dir: /tmp/anyrepo-cache",
                         "debug: true",
                         "minimum_release_age: 2d",
+                        "priority: 99",
                         "refresh_interval: 1h",
                     ]
                 ),
@@ -491,6 +492,7 @@ class CliTest(unittest.TestCase):
                         "github_token_file:",
                         "gpgcheck: global(0)",
                         "minimum_release_age: global(2d)",
+                        "priority: global(99)",
                         "refresh_interval: global(1h)",
                         "releasever: el9",
                         "source: github-release",
@@ -545,6 +547,30 @@ class CliTest(unittest.TestCase):
                 stdout.getvalue().strip(),
                 f"[prec] gpgcheck: global(0) -> 0 ({repo_path})",
             )
+
+    def test_priority_can_be_set_globally_and_overridden_per_repository(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\npriority = 50\n\n"
+                    "[prec]\nurl = https://github.com/jfut/prec\n"
+                )
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "set", "priority", "20"])
+            self.assertEqual(result, 0)
+            self.assertEqual(stdout.getvalue().strip(), f"[main] priority: 50 -> 20 ({path})")
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "prec", "set", "priority", "10"])
+            self.assertEqual(result, 0)
+            self.assertEqual(stdout.getvalue().strip(), f"[prec] priority: global(20) -> 10 ({path})")
+
+            config = load_config(path)
+            self.assertEqual(config.repos["prec"].priority, 10)
 
     def test_global_set_prints_refresh_hint_only_once(self):
         with tempfile.TemporaryDirectory() as tmp:
