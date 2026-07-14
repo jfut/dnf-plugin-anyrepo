@@ -77,9 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--minimum-release-age")
     add.add_argument("--priority")
     add.add_argument("--github-token-file")
-    state = add.add_mutually_exclusive_group()
-    state.add_argument("--enabled", action="store_true")
-    state.add_argument("--disabled", action="store_true")
+    add.add_argument("--enabled", choices=("0", "1"))
     add.add_argument("--force", action="store_true")
 
     remove = sub.add_parser("remove")
@@ -135,11 +133,8 @@ def _run(args: argparse.Namespace) -> int:
             "minimum_release_age": args.minimum_release_age,
             "priority": args.priority,
             "github_token_file": args.github_token_file,
+            "enabled": args.enabled,
         }
-        if args.enabled:
-            values["enabled"] = "true"
-        if args.disabled:
-            values["enabled"] = "false"
         owner, repository = parse_github_url(args.url)
         url = f"https://github.com/{owner}/{repository}"
         name = validate_repo_name(args.name) if args.name else repo_name_from_url(url)
@@ -348,7 +343,8 @@ def _print_list(config) -> None:
                 repo.name,
                 repo.source,
                 repo.url,
-                "yes" if repo.enabled else "no",
+                # Keep enabled values consistent with other inherited settings.
+                _format_repo_config_value(config, repo, "enabled"),
                 _format_repo_config_value(config, repo, "gpgcheck"),
                 format_duration(repo.minimum_release_age, inherited=inherited),
             ]
@@ -364,6 +360,7 @@ def _print_global_show(main) -> None:
         "asset_include": main.asset_include,
         "cache_dir": main.cache_dir,
         "debug": "true" if main.debug else "false",
+        "enabled": "true" if main.enabled else "false",
         "refresh_interval": format_duration(main.refresh_interval),
         "minimum_release_age": format_duration(main.minimum_release_age),
         "priority": str(main.priority),
@@ -422,7 +419,13 @@ def _format_mutation_result(path: str, message: str) -> str:
 
 def _format_repo_config_value(config, repo, key: str) -> str:
     value = getattr(repo, key)
-    if key == "gpgcheck" and key not in _section_options(config.path, repo.name):
+    explicit_options = _section_options(config.path, repo.name)
+    if key == "enabled":
+        formatted = "1" if value else "0"
+        if key not in explicit_options:
+            return f"global({formatted})"
+        return formatted
+    if key == "gpgcheck" and key not in explicit_options:
         return _format_inherited_gpgcheck()
     inherited_global_keys = {
         "asset_exclude",
@@ -432,7 +435,7 @@ def _format_repo_config_value(config, repo, key: str) -> str:
         "minimum_release_age",
         "priority",
     }
-    if key in inherited_global_keys and key not in _section_options(config.path, repo.name):
+    if key in inherited_global_keys and key not in explicit_options:
         return f"global({_format_display_value(key, value)})"
     return _format_display_value(key, value)
 
@@ -454,11 +457,16 @@ def _describe_current_value(path: str, section: str, key: str) -> str:
         repo = config.repos.get(section)
         if repo is None or not hasattr(repo, key):
             return "(unset)"
+        if key == "enabled":
+            return _format_repo_config_value(config, repo, key)
         return _format_display_value(key, getattr(repo, key))
 
     repo = config.repos.get(section)
     if repo is None or not hasattr(repo, key):
         return "(unset)"
+
+    if key == "enabled":
+        return _format_repo_config_value(config, repo, key)
 
     inherited = key not in explicit_options
     if key == "gpgcheck" and inherited:
@@ -467,6 +475,7 @@ def _describe_current_value(path: str, section: str, key: str) -> str:
         "asset_exclude",
         "asset_include",
         "cache_dir",
+        "enabled",
         "refresh_interval",
         "minimum_release_age",
         "priority",

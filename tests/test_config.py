@@ -64,6 +64,24 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(config.repos["prec"].priority, 99)
             self.assertFalse(config.main.debug)
 
+    def test_load_repo_inherits_global_enabled_and_allows_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    "enabled = 0\n\n"
+                    "[inherited]\n"
+                    "url = https://github.com/jfut/inherited\n\n"
+                    "[override]\n"
+                    "url = https://github.com/jfut/override\n"
+                    "enabled = 1\n"
+                )
+            config = load_config(path)
+            self.assertFalse(config.main.enabled)
+            self.assertFalse(config.repos["inherited"].enabled)
+            self.assertTrue(config.repos["override"].enabled)
+
     def test_load_repo_priority_override(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
@@ -238,6 +256,8 @@ class ConfigTest(unittest.TestCase):
             path = os.path.join(tmp, "anyrepo.conf")
             with self.assertRaises(ConfigError):
                 set_value(path, "main", "debug", "maybe")
+            with self.assertRaises(ConfigError):
+                set_value(path, "main", "enabled", "maybe")
             with self.assertRaises(ConfigError):
                 set_value(path, "main", "asset_include", "[")
             with self.assertRaises(ConfigError):

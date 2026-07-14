@@ -60,6 +60,10 @@ _dnf_anyrepo_complete()
             COMPREPLY=( $(compgen -W 'github-release' -- "$cur") )
             return
             ;;
+        --enabled)
+            COMPREPLY=( $(compgen -W '0 1' -- "$cur") )
+            return
+            ;;
     esac
 
     if [ "${#args[@]}" -eq 0 ]; then
@@ -73,7 +77,7 @@ _dnf_anyrepo_complete()
             options=(
                 -n --name --source --asset-include --asset-exclude --arch
                 --releasever --minimum-release-age --priority --github-token-file
-                --enabled --disabled --force
+                --enabled --force
             )
             ;;
         remove)
@@ -98,14 +102,14 @@ _dnf_anyrepo_complete()
             case "${args[1]}" in
                 get|unset)
                     if [ "${#args[@]}" -eq 2 ]; then
-                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age priority refresh_interval' -- "$cur") )
+                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug enabled include minimum_release_age priority refresh_interval' -- "$cur") )
                     fi
                     return
                     ;;
                 set)
                     if [ "${#args[@]}" -eq 2 ]; then
-                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug include minimum_release_age priority refresh_interval' -- "$cur") )
-                    elif [ "${#args[@]}" -eq 3 ] && [ "${args[2]}" = debug ]; then
+                        COMPREPLY=( $(compgen -W 'asset_exclude asset_include cache_dir debug enabled include minimum_release_age priority refresh_interval' -- "$cur") )
+                    elif [ "${#args[@]}" -eq 3 ] && [[ "${args[2]}" = debug || "${args[2]}" = enabled ]]; then
                         COMPREPLY=( $(compgen -W 'true false 1 0 yes no on off' -- "$cur") )
                     fi
                     return

@@ -34,6 +34,7 @@ MAIN_CONFIG_KEYS = {
     "minimum_release_age",
     "priority",
     "debug",
+    "enabled",
     INCLUDE_KEY,
     "asset_include",
     "asset_exclude",
@@ -72,12 +73,14 @@ class MainConfig:
         include=None,
         asset_include=DEFAULT_ASSET_INCLUDE,
         asset_exclude=DEFAULT_ASSET_EXCLUDE,
+        enabled=DEFAULT_ENABLED,
     ):
         self.cache_dir = cache_dir
         self.refresh_interval = refresh_interval
         self.minimum_release_age = minimum_release_age
         self.priority = priority
         self.debug = debug
+        self.enabled = enabled
         self.include = include
         self.asset_include = asset_include
         self.asset_exclude = asset_exclude
@@ -145,6 +148,8 @@ def validate_main_value(key: str, value: object) -> None:
     elif key == "priority":
         parse_priority(value)
     elif key == "debug":
+        parse_bool(value)
+    elif key == "enabled":
         parse_bool(value)
     elif key == "asset_include":
         validate_asset_pattern(str(value), key=key)
@@ -445,6 +450,7 @@ def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
         ),
         priority=parse_priority(main_section.get("priority", DEFAULT_PRIORITY)),
         debug=parse_bool(main_section.get("debug", DEFAULT_DEBUG)),
+        enabled=parse_bool(main_section.get("enabled", DEFAULT_ENABLED)),
         include=main_section.get(INCLUDE_KEY),
         asset_include=validate_asset_pattern(
             main_section.get("asset_include", DEFAULT_ASSET_INCLUDE),
@@ -494,7 +500,8 @@ def load_config(path: str = DEFAULT_CONFIG_PATH, warn=None) -> PluginConfig:
             url=url,
             asset_include=asset_include,
             asset_exclude=asset_exclude,
-            enabled=parse_bool(item.get("enabled", DEFAULT_ENABLED)),
+            # A repository inherits the global switch unless it explicitly overrides it.
+            enabled=parse_bool(item.get("enabled", main.enabled)),
             minimum_release_age=minimum_release_age,
             cache_dir=cache_dir,
             refresh_interval=refresh_interval,

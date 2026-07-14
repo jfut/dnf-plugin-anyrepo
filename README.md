@@ -81,12 +81,12 @@ List repositories managed by AnyRepo:
 ```bash
 # dnf-anyrepo list
 NAME                SOURCE          URL                                         ENABLED  GPGCHECK   MIN_AGE
-dnf-plugin-anyrepo  github-release  https://github.com/jfut/dnf-plugin-anyrepo  yes      global(1)  global(3d)
-firehol             github-release  https://github.com/firehol/packages         yes      0          global(3d)
-ipset-fast-update   github-release  https://github.com/jfut/ipset-fast-update   yes      global(1)  global(3d)
-nmcli-cli           github-release  https://github.com/jfut/nmcli-cli           yes      global(1)  global(3d)
-prec                github-release  https://github.com/jfut/prec                yes      global(1)  global(3d)
-sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         yes      global(1)  global(3d)
+dnf-plugin-anyrepo  github-release  https://github.com/jfut/dnf-plugin-anyrepo  global(1)  global(1)  global(3d)
+firehol             github-release  https://github.com/firehol/packages         global(1)  0          global(3d)
+ipset-fast-update   github-release  https://github.com/jfut/ipset-fast-update   global(1)  global(1)  global(3d)
+nmcli-cli           github-release  https://github.com/jfut/nmcli-cli           global(1)  global(1)  global(3d)
+prec                github-release  https://github.com/jfut/prec                global(1)  global(1)  global(3d)
+sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         global(1)  global(1)  global(3d)
 ```
 
 Show details for one AnyRepo repository:
@@ -97,7 +97,7 @@ arch: x86_64
 asset_exclude: (?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
 asset_include: .*\.rpm$
 cache_dir: global(/var/cache/dnf/anyrepo)
-enabled: true
+enabled: global(1)
 github_token_file:
 minimum_release_age: global(3d)
 priority: global(99)
@@ -148,12 +148,12 @@ List repositories again after the `MIN_AGE` overrides are applied:
 ```bash
 # dnf-anyrepo list
 NAME                SOURCE          URL                                         ENABLED  GPGCHECK   MIN_AGE
-dnf-plugin-anyrepo  github-release  https://github.com/jfut/dnf-plugin-anyrepo  yes      global(1)  global(10h)
-firehol             github-release  https://github.com/firehol/packages         yes      0          global(10h)
-ipset-fast-update   github-release  https://github.com/jfut/ipset-fast-update   yes      global(1)  global(10h)
-nmcli-cli           github-release  https://github.com/jfut/nmcli-cli           yes      global(1)  3h
-prec                github-release  https://github.com/jfut/prec                yes      global(1)  global(10h)
-sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         yes      global(1)  5h
+dnf-plugin-anyrepo  github-release  https://github.com/jfut/dnf-plugin-anyrepo  global(1)  global(1)  global(10h)
+firehol             github-release  https://github.com/firehol/packages         global(1)  0          global(10h)
+ipset-fast-update   github-release  https://github.com/jfut/ipset-fast-update   global(1)  global(1)  global(10h)
+nmcli-cli           github-release  https://github.com/jfut/nmcli-cli           global(1)  global(1)  3h
+prec                github-release  https://github.com/jfut/prec                global(1)  global(1)  global(10h)
+sslcert-cli         github-release  https://github.com/jfut/sslcert-cli         global(1)  global(1)  5h
 ```
 
 Install packages through ordinary `dnf install`:
@@ -283,6 +283,7 @@ refresh_interval = 600
 minimum_release_age = 3d
 priority = 99
 debug = 0
+enabled = 1
 asset_include = .*\.rpm$
 asset_exclude = (?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
 ```
@@ -323,7 +324,7 @@ minimum_release_age=259200
 priority=99
 debug=0
 source=github-release
-enabled=true
+enabled=1
 asset_include=.*\.rpm$
 asset_exclude=(?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$)
 ```
@@ -349,7 +350,7 @@ Per-repository sections support these keys:
 Notes:
 
 - `asset_exclude` is a regular expression applied after `asset_include`, and matching assets are skipped
-- `enabled = false` disables only that repository
+- `enabled = false` disables that repository, even when the global setting is enabled
 - `github_token_file` is read and used as a GitHub API bearer token
 - `priority` is an integer; lower values take precedence
 
@@ -437,6 +438,20 @@ dnf-anyrepo repo NAME set minimum_release_age 30m
 dnf-anyrepo repo NAME unset minimum_release_age
 ```
 
+Disable or enable all repositories by default:
+
+```bash
+dnf-anyrepo global set enabled 0
+dnf-anyrepo global set enabled 1
+```
+
+Repositories with their own `enabled` setting override the global value:
+
+```bash
+dnf-anyrepo repo NAME set enabled 1
+dnf-anyrepo repo NAME unset enabled
+```
+
 The `global` commands update `[main]` and affect repositories that inherit the global setting.
 
 The `repo` commands update the named repository section and override or restore the global value only for that repository.
@@ -509,7 +524,7 @@ Repository settings:
 ```bash
 dnf-anyrepo repo prec
 dnf-anyrepo repo prec set minimum_release_age 1d
-dnf-anyrepo repo prec set enabled false
+dnf-anyrepo repo prec set enabled 0
 dnf-anyrepo repo prec set priority 50
 dnf-anyrepo repo prec set gpgcheck 1
 dnf-anyrepo repo prec set asset_exclude '$^'

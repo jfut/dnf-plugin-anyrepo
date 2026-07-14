@@ -56,6 +56,23 @@ class CliTest(unittest.TestCase):
             with open(repo_path, encoding="utf-8") as fh:
                 self.assertIn("url = https://github.com/jfut/prec\n", fh.read())
 
+    def test_add_accepts_numeric_enabled_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = main(
+                    [
+                        "--config",
+                        path,
+                        "add",
+                        "https://github.com/jfut/prec",
+                        "--enabled",
+                        "0",
+                    ]
+                )
+            self.assertEqual(result, 0)
+            self.assertFalse(load_config(path).repos["prec"].enabled)
+
     def test_add_rejects_repository_without_compatible_release_before_writing(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")
@@ -292,6 +309,7 @@ class CliTest(unittest.TestCase):
                         "asset_include: .*\\.rpm$",
                         "cache_dir: /tmp/anyrepo-cache",
                         "debug: true",
+                        "enabled: true",
                         "minimum_release_age: 2d",
                         "priority: 99",
                         "refresh_interval: 1h",
@@ -433,10 +451,12 @@ class CliTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(
                     "[main]\n"
+                    "enabled = 0\n"
                     "minimum_release_age = 3d\n"
                     "\n"
                     "[nmcli-cli]\n"
                     "url = https://github.com/jfut/nmcli-cli\n"
+                    "enabled = 1\n"
                     "gpgcheck = 0\n"
                     "\n"
                     "[prec]\n"
@@ -453,11 +473,11 @@ class CliTest(unittest.TestCase):
                 ["NAME", "SOURCE", "URL", "ENABLED", "GPGCHECK", "MIN_AGE"],
             )
             self.assertIn(
-                "nmcli-cli github-release https://github.com/jfut/nmcli-cli yes 0 global(3d)",
+                "nmcli-cli github-release https://github.com/jfut/nmcli-cli 1 0 global(3d)",
                 " ".join(lines[1].split()),
             )
             self.assertIn(
-                "prec github-release https://github.com/jfut/prec yes global(1) global(3d)",
+                "prec github-release https://github.com/jfut/prec global(0) global(1) global(3d)",
                 " ".join(lines[2].split()),
             )
 
@@ -488,7 +508,7 @@ class CliTest(unittest.TestCase):
                         "asset_exclude: global((?:-debuginfo(?:-|[.])|-debugsource(?:-|[.])|[.]src[.]rpm$))",
                         "asset_include: global(.*\\.rpm$)",
                         "cache_dir: global(/tmp/anyrepo-cache)",
-                        "enabled: true",
+                        "enabled: global(1)",
                         "github_token_file:",
                         "gpgcheck: global(0)",
                         "minimum_release_age: global(2d)",
@@ -571,6 +591,33 @@ class CliTest(unittest.TestCase):
 
             config = load_config(path)
             self.assertEqual(config.repos["prec"].priority, 10)
+
+    def test_enabled_can_be_set_globally_and_overridden_per_repository(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "[main]\n"
+                    "enabled = 1\n\n"
+                    "[prec]\n"
+                    "url = https://github.com/jfut/prec\n"
+                )
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "global", "set", "enabled", "0"])
+            self.assertEqual(result, 0)
+            self.assertEqual(stdout.getvalue().strip(), f"[main] enabled: true -> 0 ({path})")
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = main(["--config", path, "repo", "prec", "set", "enabled", "1"])
+            self.assertEqual(result, 0)
+            self.assertEqual(stdout.getvalue().strip(), f"[prec] enabled: global(0) -> 1 ({path})")
+
+            config = load_config(path)
+            self.assertFalse(config.main.enabled)
+            self.assertTrue(config.repos["prec"].enabled)
 
     def test_global_set_prints_refresh_hint_only_once(self):
         with tempfile.TemporaryDirectory() as tmp:
