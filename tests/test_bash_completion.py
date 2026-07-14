@@ -51,6 +51,12 @@ printf '%s\\n' "${{COMPREPLY[@]}}"
             ["false"],
         )
 
+    def test_add_enabled_values_are_completed(self):
+        self.assertEqual(
+            self._complete("dnf-anyrepo", "add", "--enabled", ""),
+            ["0", "1"],
+        )
+
     def test_repository_names_are_loaded_from_the_selected_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             command_path = os.path.join(tmp, "dnf-anyrepo")
