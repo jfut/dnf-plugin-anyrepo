@@ -18,6 +18,10 @@ Typical examples:
 - https://github.com/jfut/dnf-plugin-anyrepo/releases
 - https://github.com/jfut/prec/releases
 
+## Available GitHub repositories
+
+See the [dnf-plugin-anyrepo-repositories GitHub star list](https://github.com/stars/jfut/lists/dnf-plugin-anyrepo-repositories) for a curated collection of GitHub repositories that can be installed via AnyRepo.
+
 Once configured, users can run commands such as:
 
 ```bash
