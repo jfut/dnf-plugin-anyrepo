@@ -16,6 +16,7 @@ from dnf_plugin_anyrepo.dnf_plugin import (
     github_repo_id,
     repo_switch_enabled,
     repo_switch_gpgcheck,
+    source_display_name,
 )
 
 
@@ -96,6 +97,10 @@ class DnfPluginTest(unittest.TestCase):
             gpgcheck=False,
         )
         self.assertFalse(effective_repo_gpgcheck(repo, True))
+
+    def test_source_display_name_uses_source_identifier(self):
+        self.assertEqual(source_display_name("github-release"), "GitHub Release")
+        self.assertEqual(source_display_name("generic-source"), "Generic Source")
 
     def test_anyrepo_cache_dirs_collects_main_and_repo_cache_dirs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -210,6 +215,29 @@ class DnfPluginTest(unittest.TestCase):
             plugin = AnyRepoPlugin(base, None)
             plugin._add_file_repo(repo)
             self.assertEqual(base.repos[github_repo_id(repo)].priority, 10)
+
+    @unittest.skipIf(dnf is None, "dnf is not available")
+    def test_added_repo_reuses_dnf_progress_bar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = RepoConfig(
+                name="prec",
+                source="github-release",
+                url="https://github.com/jfut/prec",
+                asset_include=r".*\.rpm$",
+                enabled=True,
+                minimum_release_age=0,
+                cache_dir=tmp,
+                refresh_interval=600,
+            )
+            base = dnf.Base()
+            plugin = AnyRepoPlugin(base, None)
+            progress = mock.Mock()
+            plugin._anyrepo_progress = progress
+
+            plugin._add_file_repo(repo)
+
+            self.assertIs(base.repos[github_repo_id(repo)]._md_pload.progress, progress)
+            self.assertEqual(base.repos[github_repo_id(repo)].name, "GitHub Release - prec")
 
     @unittest.skipIf(dnf is None, "dnf is not available")
     def test_warn_unsigned_packages_continues_with_assumeyes(self):

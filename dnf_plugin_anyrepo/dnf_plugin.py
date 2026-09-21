@@ -30,6 +30,15 @@ ORANGE = "\033[38;5;214m"
 COLOR_RESET = "\033[0m"
 
 
+def source_display_name(source):
+    """Convert a source identifier into the label shown by DNF."""
+
+    words = source.replace("-", " ").split()
+    return " ".join(
+        "GitHub" if word.lower() == "github" else word.capitalize() for word in words
+    )
+
+
 def github_repo_id(repo):
     """Use a GitHub-derived id that libdnf accepts as a repository id."""
 
@@ -155,9 +164,11 @@ if dnf is not None:
                 self._anyrepo_debug = False
                 self._anyrepo_repo_ids = set()
                 self._anyrepo_repo_names = {}
+                self._anyrepo_progress = None
                 self._warn(f"failed to load AnyRepo configuration: {exc}")
                 return
             self._anyrepo_debug = manager.config.main.debug
+            self._anyrepo_progress = self._repo_progress()
             self._anyrepo_repo_names = {}
             for repo in manager.enabled_repos():
                 self._anyrepo_repo_names[github_repo_id(repo)] = repo.name
@@ -220,10 +231,14 @@ if dnf is not None:
                 dnf_repo = dnf.repo.Repo(repo_id, self.base.conf)
                 dnf_repo.baseurl += [baseurl]
                 self.base.repos.add(dnf_repo)
-            dnf_repo.name = f"GitHub {repo.name}{name_suffix}"
+            dnf_repo.name = f"{source_display_name(repo.source)} - {repo.name}{name_suffix}"
             dnf_repo.enabled = enabled
             dnf_repo.skip_if_unavailable = True
             dnf_repo.metadata_expire = 0
+            progress = getattr(self, "_anyrepo_progress", None)
+            if progress is not None:
+                # Reuse DNF's own renderer so dynamic repositories get one standard line.
+                dnf_repo.set_progress_bar(progress)
             # Apply the inherited or repository-specific priority to DNF's dynamic repo.
             dnf_repo.priority = repo.priority
             dnf_repo.gpgcheck = effective_repo_gpgcheck(
@@ -241,6 +256,16 @@ if dnf is not None:
         def _disable_repo_switch(self):
             if REPO_SWITCH_ID in self.base.repos:
                 self.base.repos[REPO_SWITCH_ID].disable()
+
+        def _repo_progress(self):
+            """Return the progress callback already configured by DNF."""
+
+            for repo in self.base.repos.values():
+                payload = getattr(repo, "_md_pload", None)
+                progress = getattr(payload, "progress", None)
+                if progress is not None:
+                    return progress
+            return None
 
         def _debug(self, message):
             if not getattr(self, "_anyrepo_debug", False):
