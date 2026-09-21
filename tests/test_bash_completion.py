@@ -57,6 +57,12 @@ printf '%s\\n' "${{COMPREPLY[@]}}"
             ["0", "1"],
         )
 
+    def test_add_gpgcheck_values_are_completed(self):
+        self.assertEqual(
+            self._complete("dnf-anyrepo", "add", "--gpgcheck", ""),
+            ["0", "1"],
+        )
+
     def test_repository_names_are_loaded_from_the_selected_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             command_path = os.path.join(tmp, "dnf-anyrepo")

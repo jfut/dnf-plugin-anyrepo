@@ -75,9 +75,13 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--arch")
     add.add_argument("--releasever")
     add.add_argument("--minimum-release-age")
+    add.add_argument("--cache-dir")
+    add.add_argument("--refresh-interval")
     add.add_argument("--priority")
     add.add_argument("--github-token-file")
     add.add_argument("--enabled", choices=("0", "1"))
+    # Allow the repository-specific DNF signature-check setting at creation time.
+    add.add_argument("--gpgcheck", choices=("0", "1"))
     add.add_argument("--force", action="store_true")
 
     remove = sub.add_parser("remove")
@@ -131,9 +135,12 @@ def _run(args: argparse.Namespace) -> int:
             "arch": args.arch,
             "releasever": args.releasever,
             "minimum_release_age": args.minimum_release_age,
+            "cache_dir": args.cache_dir,
+            "refresh_interval": args.refresh_interval,
             "priority": args.priority,
             "github_token_file": args.github_token_file,
             "enabled": args.enabled,
+            "gpgcheck": args.gpgcheck,
         }
         owner, repository = parse_github_url(args.url)
         url = f"https://github.com/{owner}/{repository}"
@@ -208,8 +215,8 @@ def validate_repository(path: str, name: str, url: str, source: str, values: dic
             values["minimum_release_age"] or main.minimum_release_age
         ),
         priority=parse_priority(values["priority"] or main.priority),
-        cache_dir=main.cache_dir or DEFAULT_CACHE_DIR,
-        refresh_interval=main.refresh_interval,
+        cache_dir=values["cache_dir"] or main.cache_dir or DEFAULT_CACHE_DIR,
+        refresh_interval=parse_duration(values["refresh_interval"] or main.refresh_interval),
         arch=values["arch"] or current_arch(),
         releasever=values["releasever"] or current_releasever(),
         github_token_file=values["github_token_file"],
