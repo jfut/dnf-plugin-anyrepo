@@ -209,6 +209,25 @@ class GitHubReleaseProviderTest(unittest.TestCase):
                 ],
             )
 
+    def test_matching_assets_accepts_go_architecture_names_in_rpm_assets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp, name="jsonize")
+            config.asset_include = r"\.rpm$"
+            config.arch = "x86_64"
+            provider = GitHubReleaseProvider(config)
+            assets = provider._matching_assets(
+                {
+                    "assets": [
+                        {"name": "jsonize_0.8.0_linux_amd64.rpm"},
+                        {"name": "jsonize_0.8.0_linux_arm64.rpm"},
+                    ]
+                }
+            )
+            self.assertEqual(
+                [asset["name"] for asset in assets],
+                ["jsonize_0.8.0_linux_amd64.rpm"],
+            )
+
     def test_matching_assets_falls_back_to_nearest_lower_releasever(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = self.make_config(tmp, name="tool")
