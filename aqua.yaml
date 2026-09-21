@@ -10,8 +10,9 @@ checksum:
 registries:
 # https://github.com/aquaproj/aqua-registry
 - type: standard
-  ref: v4.526.0 # renovate: depName=aquaproj/aqua-registry
+  ref: v4.565.0 # renovate: depName=aquaproj/aqua-registry
 # aqua update-checksum --prune
 packages:
-- name: casey/just@1.53.0
-- name: goreleaser/goreleaser@v2.16.0
+- name: casey/just@1.58.0
+- name: cli/cli@v2.101.0
+- name: goreleaser/goreleaser@v2.18.2

@@ -1,28 +1,38 @@
 {
   "checksums": [
     {
-      "id": "github_release/github.com/casey/just/1.53.0/just-1.53.0-aarch64-unknown-linux-musl.tar.gz",
-      "checksum": "F29D8E72380BC144465F632C7D59DA311205EEF2923D57511708B05B82F2E64F",
+      "id": "github_release/github.com/casey/just/1.58.0/just-1.58.0-aarch64-unknown-linux-musl.tar.gz",
+      "checksum": "748237128C4C40CBDABC65E841D05CEBA13CC23A91EABA395495894C1D9764DF",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/casey/just/1.53.0/just-1.53.0-x86_64-unknown-linux-musl.tar.gz",
-      "checksum": "7FEDEB22C7E14D9EF1551E8B793700866D80F409F9884B0E80EBB65C11D4874D",
+      "id": "github_release/github.com/casey/just/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz",
+      "checksum": "4A5CC2F53E6F0F8C59092A6CC38291EB729D46A7DD95D3AE582008881B84931D",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/goreleaser/goreleaser/v2.16.0/goreleaser_Linux_arm64.tar.gz",
-      "checksum": "0102D974373FCDEB77042D1F5897CAFFA193BE36620FDC6C1DA43A01EF8E10D3",
+      "id": "github_release/github.com/cli/cli/v2.101.0/gh_2.101.0_linux_amd64.tar.gz",
+      "checksum": "9BCA2D1C16825F109907A23307628A2F0698FBF99662B73A5CF0B020293072B8",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/goreleaser/goreleaser/v2.16.0/goreleaser_Linux_x86_64.tar.gz",
-      "checksum": "EAAE05B5EBA07533BD0F06846B68C808399504784DF00C62EB219541FC04E5E2",
+      "id": "github_release/github.com/cli/cli/v2.101.0/gh_2.101.0_linux_arm64.tar.gz",
+      "checksum": "B57E8063F18862647C9D22727C32E9DA1B963F8BF9DB648FE123A6975695640F",
       "algorithm": "sha256"
     },
     {
-      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.526.0/registry.yaml",
-      "checksum": "E2BB546D74F7E8D5276F00F2BC342E0CA3D7AC34B7AA442058CBFDBE318346E8",
+      "id": "github_release/github.com/goreleaser/goreleaser/v2.18.2/goreleaser_Linux_arm64.tar.gz",
+      "checksum": "A71681B29194F08F057A68CFCAA5C6B15D907A83A2622C51900C4FAFF828F322",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/goreleaser/goreleaser/v2.18.2/goreleaser_Linux_x86_64.tar.gz",
+      "checksum": "0A96EDC9D9BC594E4A41CC4D59467C182062910AB24D9D1F6DD7B667D32606D3",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "registries/github_content/github.com/aquaproj/aqua-registry/v4.565.0/registry.yaml",
+      "checksum": "7E2ACD4E2EE5E784174B0AF2DC9B86A0985A41B31FDC3F2C2A52915555ACD4FE",
       "algorithm": "sha256"
     }
   ]
