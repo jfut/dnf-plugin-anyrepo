@@ -124,4 +124,5 @@ def run_createrepo(cache_path: str) -> None:
     binary = shutil.which("createrepo_c")
     if not binary:
         raise RepoError("createrepo_c command is required")
-    subprocess.run([binary, "--update", cache_path], check=True)
+    # Let DNF render the repository progress line when it loads the generated metadata.
+    subprocess.run([binary, "--quiet", "--update", cache_path], check=True)
