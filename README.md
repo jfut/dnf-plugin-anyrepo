@@ -73,11 +73,10 @@ dnf-anyrepo add https://github.com/jfut/ipset-fast-update
 
 Use `-n` or `--name` to register a repository under an alias instead of the repository name.
 
-The following release RPMs are unsigned, so gpgcheck must be disabled.
+The following release RPMs are unsigned, so gpgcheck must be disabled when adding the repository.
 
 ```bash
-dnf-anyrepo add https://github.com/firehol/packages -n firehol
-dnf-anyrepo repo firehol set gpgcheck 0
+dnf-anyrepo add https://github.com/firehol/packages -n firehol --gpgcheck 0
 ```
 
 List repositories managed by AnyRepo:
@@ -497,10 +496,13 @@ dnf-anyrepo add https://github.com/firehol/packages -n firehol
 # with options
 dnf-anyrepo add https://github.com/jfut/prec --asset-include '.*\.rpm$'
 dnf-anyrepo add https://github.com/jfut/prec --asset-exclude '$^'
-dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 30m
+dnf-anyrepo add https://github.com/jfut/prec --cache-dir /var/cache/dnf/anyrepo-prec
+dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 0
+dnf-anyrepo add https://github.com/jfut/prec --refresh-interval 30m
 dnf-anyrepo add https://github.com/jfut/prec --priority 25
 dnf-anyrepo add https://github.com/jfut/prec --arch x86_64 --releasever el10
 dnf-anyrepo add https://github.com/jfut/prec --github-token-file /etc/anyrepo/github.token
+dnf-anyrepo add https://github.com/firehol/packages -n firehol --gpgcheck 0
 ```
 
 By default, each added repository is stored in `/etc/dnf/plugins/anyrepo.d/NAME.conf`.

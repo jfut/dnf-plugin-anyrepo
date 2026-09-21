@@ -73,6 +73,45 @@ class CliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertFalse(load_config(path).repos["prec"].enabled)
 
+    def test_add_accepts_numeric_gpgcheck_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = main(
+                    [
+                        "--config",
+                        path,
+                        "add",
+                        "https://github.com/jfut/prec",
+                        "--gpgcheck",
+                        "0",
+                    ]
+                )
+            self.assertEqual(result, 0)
+            self.assertFalse(load_config(path).repos["prec"].gpgcheck)
+
+    def test_add_accepts_repository_cache_and_refresh_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "anyrepo.conf")
+            cache_dir = os.path.join(tmp, "cache")
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = main(
+                    [
+                        "--config",
+                        path,
+                        "add",
+                        "https://github.com/jfut/prec",
+                        "--cache-dir",
+                        cache_dir,
+                        "--refresh-interval",
+                        "30m",
+                    ]
+                )
+            self.assertEqual(result, 0)
+            repo = load_config(path).repos["prec"]
+            self.assertEqual(repo.cache_dir, cache_dir)
+            self.assertEqual(repo.refresh_interval, 1800)
+
     def test_add_rejects_repository_without_compatible_release_before_writing(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "anyrepo.conf")

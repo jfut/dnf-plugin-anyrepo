@@ -60,7 +60,15 @@ _dnf_anyrepo_complete()
             COMPREPLY=( $(compgen -W 'github-release' -- "$cur") )
             return
             ;;
+        --cache-dir)
+            COMPREPLY=( $(compgen -d -- "$cur") )
+            return
+            ;;
         --enabled)
+            COMPREPLY=( $(compgen -W '0 1' -- "$cur") )
+            return
+            ;;
+        --gpgcheck)
             COMPREPLY=( $(compgen -W '0 1' -- "$cur") )
             return
             ;;
@@ -76,8 +84,9 @@ _dnf_anyrepo_complete()
         add)
             options=(
                 -n --name --source --asset-include --asset-exclude --arch
-                --releasever --minimum-release-age --priority --github-token-file
-                --enabled --force
+                --releasever --minimum-release-age --cache-dir --refresh-interval
+                --priority --github-token-file
+                --enabled --gpgcheck --force
             )
             ;;
         remove)
