@@ -38,6 +38,14 @@ GITHUB_RELEASES_PER_PAGE = 100
 EL_MARKER_RE = re.compile(
     r"(?P<marker>\.(?:module_)?el(?P<major>\d+)(?:[._][A-Za-z0-9]+)*)(?=\.[^.]+\.rpm$)"
 )
+# GoReleaser uses Go architecture names in RPM asset filenames, while RPM
+# metadata and the local platform use names such as x86_64 and aarch64.
+RPM_ARCH_ALIASES = {
+    "x86_64": ("x86_64", "amd64"),
+    "amd64": ("x86_64", "amd64"),
+    "aarch64": ("aarch64", "arm64"),
+    "arm64": ("aarch64", "arm64"),
+}
 
 
 class GitHubReleaseProvider:
@@ -232,8 +240,14 @@ class GitHubReleaseProvider:
         """Apply the RPM arch filter while allowing noarch packages."""
 
         if self.config.arch:
-            arch_suffix = f".{self.config.arch}.rpm"
-            if not (name.endswith(arch_suffix) or name.endswith(".noarch.rpm")):
+            if name.endswith((".noarch.rpm", "_noarch.rpm", "-noarch.rpm")):
+                return True
+            architectures = RPM_ARCH_ALIASES.get(self.config.arch, (self.config.arch,))
+            if not any(
+                name.endswith(f"{separator}{architecture}.rpm")
+                for separator in (".", "_", "-")
+                for architecture in architectures
+            ):
                 return False
         return True
 
