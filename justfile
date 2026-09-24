@@ -76,9 +76,9 @@ test-e2e: snapshot
         sudo rpm --import packaging/RPM-GPG-KEY-jfut-github
         key_imported=1
     fi
-    sudo dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 0 --force
-    sudo dnf-anyrepo list
-    sudo dnf "${dnf_opts[@]}" list prec | tee "$tmp/dnf-list.txt"
+    sudo --preserve-env=GITHUB_TOKEN dnf-anyrepo add https://github.com/jfut/prec --minimum-release-age 0 --force
+    sudo --preserve-env=GITHUB_TOKEN dnf-anyrepo list
+    sudo --preserve-env=GITHUB_TOKEN dnf "${dnf_opts[@]}" list prec | tee "$tmp/dnf-list.txt"
     grep 'github.com:jfut:prec' "$tmp/dnf-list.txt"
     host_arch="$(arch)"
     if [ "$host_arch" = "amd64" ]; then
@@ -91,7 +91,7 @@ test-e2e: snapshot
         echo "unexpected foreign architecture package on $host_arch host" >&2
         exit 1
     fi
-    sudo dnf "${dnf_opts[@]}" install -y prec
+    sudo --preserve-env=GITHUB_TOKEN dnf "${dnf_opts[@]}" install -y prec
     sudo dnf "${dnf_opts[@]}" remove -y prec
     if [ "$key_imported" = "1" ]; then
         sudo rpm -e "$key_pkg"
