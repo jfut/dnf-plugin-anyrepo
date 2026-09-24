@@ -354,6 +354,7 @@ Notes:
 
 - `asset_exclude` is a regular expression applied after `asset_include`, and matching assets are skipped
 - `enabled = false` disables that repository, even when the global setting is enabled
+- `GITHUB_TOKEN` is used as the GitHub API bearer token when set, for example `export GITHUB_TOKEN=$(gh auth token)`
 - `github_token_file` is read and used as a GitHub API bearer token
 - `priority` is an integer; lower values take precedence
 

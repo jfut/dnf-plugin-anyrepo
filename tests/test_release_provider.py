@@ -323,6 +323,25 @@ class GitHubReleaseProviderTest(unittest.TestCase):
             self.assertEqual(urlopen_mock.call_count, 2)
             sleep_mock.assert_called_once_with(1.0)
 
+    def test_headers_use_github_token_environment_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            provider = GitHubReleaseProvider(self.make_config(tmp))
+            with mock.patch.dict(os.environ, {"GITHUB_TOKEN": " env-token "}):
+                headers = provider._headers()
+            self.assertEqual(headers["Authorization"], "Bearer env-token")
+
+    def test_headers_prefer_github_token_environment_variable_over_token_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            token_path = os.path.join(tmp, "github.token")
+            with open(token_path, "w", encoding="utf-8") as fh:
+                fh.write("file-token\n")
+            config = self.make_config(tmp)
+            config.github_token_file = token_path
+            provider = GitHubReleaseProvider(config)
+            with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "env-token"}):
+                headers = provider._headers()
+            self.assertEqual(headers["Authorization"], "Bearer env-token")
+
     def test_fetch_latest_eligible_release_skips_too_new_latest(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider = GitHubReleaseProvider(self.make_config(tmp))

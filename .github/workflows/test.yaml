@@ -22,6 +22,8 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
@@ -65,4 +67,6 @@ jobs:
         run: just test
 
       - name: Run e2e tests on ${{ matrix.image }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just test-e2e

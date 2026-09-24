@@ -462,6 +462,13 @@ class GitHubReleaseProvider:
         return headers
 
     def _read_token(self) -> Optional[str]:
+        # Use the standard GitHub CLI-compatible environment variable so a token
+        # exported by `gh auth token` can authenticate API requests without config.
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            token = token.strip()
+            if token:
+                return token
         path = self.config.github_token_file
         if not path:
             return None
