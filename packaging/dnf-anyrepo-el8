@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/libexec/platform-python
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the dnf-plugin-anyrepo project.
 

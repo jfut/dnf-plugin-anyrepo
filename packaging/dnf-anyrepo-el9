@@ -1,0 +1,10 @@
+#!/usr/bin/python3.9
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the dnf-plugin-anyrepo project.
+
+"""Run the dnf-plugin-anyrepo management CLI."""
+
+from dnf_plugin_anyrepo.cli import main
+
+
+raise SystemExit(main())
